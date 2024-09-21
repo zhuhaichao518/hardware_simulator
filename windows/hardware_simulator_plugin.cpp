@@ -10,6 +10,7 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
+#include <future>
 #include <memory>
 #include <sstream>
 
@@ -60,7 +61,6 @@ HDESK syncThreadDesktop() {
 
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 
-// 发送输入的异步重试逻辑
 void async_send_input_retry(INPUT& i) {
     while (true) {
         auto send = SendInput(1, &i, sizeof(INPUT));
@@ -73,7 +73,7 @@ void async_send_input_retry(INPUT& i) {
             _lastKnownInputDesktop = hDesk;
         }
         else {
-            break; // 如果桌面没有改变，跳出循环
+            break;
         }
     }
 }
@@ -131,7 +131,7 @@ void button_mouse(int button, bool release) {
 
 #pragma warning(disable:4244)
 
-void keyboard(uint16_t modcode, bool release) {
+void performKeyEvent(uint16_t modcode, bool isDown) {
     INPUT i{};
     i.type = INPUT_KEYBOARD;
     auto& ki = i.ki;
@@ -166,7 +166,7 @@ void keyboard(uint16_t modcode, bool release) {
         break;
     }
 
-    if (release) {
+    if (!isDown) {
         ki.dwFlags |= KEYEVENTF_KEYUP;
     }
 
@@ -230,9 +230,17 @@ void HardwareSimulatorPlugin::HandleMethodCall(
       version_stream << "7";
     }
     result->Success(flutter::EncodableValue(version_stream.str()));
-  } else if (method_call.method_name().compare("performKeyEvent") == 0) {
-    int keyCode = std::get<int>(args->at(flutter::EncodableValue("keyCode")));
-    bool isDown = std::get<int>(args->at(flutter::EncodableValue("isDown")));
+  } else if (method_call.method_name().compare("KeyPress") == 0) {
+    const flutter::EncodableMap* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (args) {
+        auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
+        auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
+        performKeyEvent(static_cast<int>(std::get<int>((keyCode))), static_cast<bool>(std::get<bool>((isDown))));
+        result->Success(nullptr);
+    }
+    else {
+        result->Error("InvalidArguments", "Expected a map with keyCode and isDown.");
+    }
   }
   else {
     result->NotImplemented();

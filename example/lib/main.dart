@@ -1,63 +1,93 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:hardware_simulator/hardware_simulator.dart';
-
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
+class MyApp extends StatelessWidget {
   @override
-  State<MyApp> createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: Text('Hardware Simulator')),
+        body: SimulatorScreen(),
+      ),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  final _hardwareSimulatorPlugin = HardwareSimulator();
-
+class SimulatorScreen extends StatefulWidget {
   @override
-  void initState() {
-    super.initState();
-    initPlatformState();
+  _SimulatorScreenState createState() => _SimulatorScreenState();
+}
+
+class _SimulatorScreenState extends State<SimulatorScreen> {
+  final TextEditingController xController = TextEditingController();
+  final TextEditingController yController = TextEditingController();
+  final TextEditingController relXController = TextEditingController();
+  final TextEditingController relYController = TextEditingController();
+  final TextEditingController keyController = TextEditingController();
+
+  final HardwareSimulator hardwareSimulator = HardwareSimulator();
+
+  void _moveMouseAbsolute() {
+    double x = double.tryParse(xController.text) ?? 0;
+    double y = double.tryParse(yController.text) ?? 0;
+    hardwareSimulator.getMouse().performMouseMoveAbsl(x, y, 0);
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion = await _hardwareSimulatorPlugin.getPlatformVersion() ??
-          'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
+  void _moveMouseRelative() {
+    double deltaX = double.tryParse(relXController.text) ?? 0;
+    double deltaY = double.tryParse(relYController.text) ?? 0;
+    hardwareSimulator.getMouse().performMouseMoveRelative(deltaX, deltaY, 0);
+  }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
+  void _pressKey() {
+    int keyCode = int.tryParse(keyController.text) ?? 0; // Assuming key code is an integer
+    hardwareSimulator.getKeyboard().performKeyEvent(keyCode, true); // Press down
+    Future.delayed(Duration(milliseconds: 100), () {
+      hardwareSimulator.getKeyboard().performKeyEvent(keyCode, false); // Release
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // First Row: Absolute Mouse Move
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(child: TextField(controller: xController, decoration: InputDecoration(labelText: 'X (% from left)'))),
+            Expanded(child: TextField(controller: yController, decoration: InputDecoration(labelText: 'Y (% from top)'))),
+            ElevatedButton(onPressed: _moveMouseAbsolute, child: Text('Move Mouse to X, Y')),
+          ],
         ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+        SizedBox(height: 20),
+
+        // Second Row: Relative Mouse Move
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(child: TextField(controller: relXController, decoration: InputDecoration(labelText: 'Delta X'))),
+            Expanded(child: TextField(controller: relYController, decoration: InputDecoration(labelText: 'Delta Y'))),
+            ElevatedButton(onPressed: _moveMouseRelative, child: Text('Move Mouse Relative')),
+          ],
         ),
-      ),
+        SizedBox(height: 20),
+
+        // Third Row: Keyboard Action
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(child: TextField(controller: keyController, decoration: InputDecoration(labelText: 'Key Code'))),
+            ElevatedButton(onPressed: _pressKey, child: Text('Press A')),
+          ],
+        ),
+      ],
     );
   }
 }
