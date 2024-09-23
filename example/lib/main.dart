@@ -45,11 +45,30 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _pressKey() {
+    _transferFocus();
     int keyCode = int.tryParse(keyController.text) ?? 0; // Assuming key code is an integer
     hardwareSimulator.getKeyboard().performKeyEvent(keyCode, true); // Press down
     Future.delayed(Duration(milliseconds: 100), () {
       hardwareSimulator.getKeyboard().performKeyEvent(keyCode, false); // Release
     });
+  }
+
+  FocusNode? _textFieldFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _textFieldFocusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _textFieldFocusNode?.dispose();
+    super.dispose();
+  }
+
+  void _transferFocus() {
+    FocusScope.of(context).requestFocus(_textFieldFocusNode);
   }
 
   @override
@@ -78,14 +97,20 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           ],
         ),
         SizedBox(height: 20),
-
         // Third Row: Keyboard Action
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Expanded(child: TextField(controller: keyController, decoration: InputDecoration(labelText: 'Key Code'))),
-            ElevatedButton(onPressed: _pressKey, child: Text('Press A')),
+            ElevatedButton(onPressed: _pressKey, child: Text('Press to Simulate Keyboard Input')),
           ],
+        ),
+        SizedBox(height: 20),
+        TextField(
+          focusNode: _textFieldFocusNode,
+          decoration: InputDecoration(
+            hintText: 'Simulated keyboard input',
+          ),
         ),
       ],
     );

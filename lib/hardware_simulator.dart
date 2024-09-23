@@ -14,8 +14,8 @@ class HWMouse {
         .performMouseMoveRelative(deltax, deltay, screenId);
   }
 
-  void performMouseMoveAbsl(double x, double y, int screenId) {
-    HardwareSimulatorPlatform.instance.performMouseMoveAbsl(x, y, screenId);
+  void performMouseMoveAbsl(double percentx, double percenty, int screenId) {
+    HardwareSimulatorPlatform.instance.performMouseMoveAbsl(percentx, percenty, screenId);
   }
 
   void performMouseClick(int buttonId, bool isDown) {

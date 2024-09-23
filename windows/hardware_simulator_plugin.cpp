@@ -173,21 +173,28 @@ void performKeyEvent(uint16_t modcode, bool isDown) {
     send_input(i);
 }
 
-void abs_mouse(float x, float y) {
-    INPUT i{};
+void performMouseMoveRelative(double x,double y){
+    INPUT i {};
 
     i.type = INPUT_MOUSE;
-    auto& mi = i.mi;
+    auto &mi = i.mi;
 
-    mi.dwFlags =
-        MOUSEEVENTF_MOVE |
-        MOUSEEVENTF_ABSOLUTE |
-
-        // MOUSEEVENTF_VIRTUALDESK maps to the entirety of the desktop rather than the primary desktop
-        MOUSEEVENTF_VIRTUALDESK;
-
+    mi.dwFlags = MOUSEEVENTF_MOVE;
     mi.dx = x;
     mi.dy = y;
+
+    send_input(i);
+}
+
+void performMouseMoveAbsl(double x,double y){
+    INPUT i {};
+
+    i.type = INPUT_MOUSE;
+    auto &mi = i.mi;
+
+    mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+    mi.dx = x * 65535;
+    mi.dy = y * 65535;
 
     send_input(i);
 }
@@ -219,6 +226,7 @@ void hscroll(int distance) {
 void HardwareSimulatorPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const flutter::EncodableMap* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
   if (method_call.method_name().compare("getPlatformVersion") == 0) {
     std::ostringstream version_stream;
     version_stream << "Windows ";
@@ -231,16 +239,20 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     }
     result->Success(flutter::EncodableValue(version_stream.str()));
   } else if (method_call.method_name().compare("KeyPress") == 0) {
-    const flutter::EncodableMap* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
-    if (args) {
         auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
         auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
         performKeyEvent(static_cast<int>(std::get<int>((keyCode))), static_cast<bool>(std::get<bool>((isDown))));
         result->Success(nullptr);
-    }
-    else {
-        result->Error("InvalidArguments", "Expected a map with keyCode and isDown.");
-    }
+  } else if (method_call.method_name().compare("mouseMoveR") == 0) {
+        auto deltax = (args->find(flutter::EncodableValue("x")))->second;
+        auto deltay = (args->find(flutter::EncodableValue("y")))->second;
+        performMouseMoveRelative(static_cast<double>(std::get<double>((deltax))), static_cast<double>(std::get<double>((deltay))));
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("mouseMoveA") == 0) {
+        auto percentx = (args->find(flutter::EncodableValue("x")))->second;
+        auto percenty = (args->find(flutter::EncodableValue("y")))->second;
+        performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
+        result->Success(nullptr);
   }
   else {
     result->NotImplemented();
