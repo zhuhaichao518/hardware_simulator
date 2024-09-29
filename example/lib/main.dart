@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -46,10 +47,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _pressKey() {
     _transferFocus();
-    int keyCode = int.tryParse(keyController.text) ?? 0; // Assuming key code is an integer
-    hardwareSimulator.getKeyboard().performKeyEvent(keyCode, true); // Press down
+    int keyCode = int.tryParse(keyController.text) ??
+        0; // Assuming key code is an integer
+    hardwareSimulator
+        .getKeyboard()
+        .performKeyEvent(keyCode, true); // Press down
     Future.delayed(Duration(milliseconds: 100), () {
-      hardwareSimulator.getKeyboard().performKeyEvent(keyCode, false); // Release
+      hardwareSimulator
+          .getKeyboard()
+          .performKeyEvent(keyCode, false); // Release
     });
   }
 
@@ -80,9 +86,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: TextField(controller: xController, decoration: InputDecoration(labelText: 'X (% from left)'))),
-            Expanded(child: TextField(controller: yController, decoration: InputDecoration(labelText: 'Y (% from top)'))),
-            ElevatedButton(onPressed: _moveMouseAbsolute, child: Text('Move Mouse to X, Y')),
+            Expanded(
+                child: TextField(
+                    controller: xController,
+                    decoration: InputDecoration(labelText: 'X (% from left)'))),
+            Expanded(
+                child: TextField(
+                    controller: yController,
+                    decoration: InputDecoration(labelText: 'Y (% from top)'))),
+            ElevatedButton(
+                onPressed: _moveMouseAbsolute,
+                child: Text('Move Mouse to X, Y')),
           ],
         ),
         SizedBox(height: 20),
@@ -91,9 +105,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: TextField(controller: relXController, decoration: InputDecoration(labelText: 'Delta X'))),
-            Expanded(child: TextField(controller: relYController, decoration: InputDecoration(labelText: 'Delta Y'))),
-            ElevatedButton(onPressed: _moveMouseRelative, child: Text('Move Mouse Relative')),
+            Expanded(
+                child: TextField(
+                    controller: relXController,
+                    decoration: InputDecoration(labelText: 'Delta X'))),
+            Expanded(
+                child: TextField(
+                    controller: relYController,
+                    decoration: InputDecoration(labelText: 'Delta Y'))),
+            ElevatedButton(
+                onPressed: _moveMouseRelative,
+                child: Text('Move Mouse Relative')),
           ],
         ),
         SizedBox(height: 20),
@@ -101,8 +123,13 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: TextField(controller: keyController, decoration: InputDecoration(labelText: 'Key Code'))),
-            ElevatedButton(onPressed: _pressKey, child: Text('Press to Simulate Keyboard Input')),
+            Expanded(
+                child: TextField(
+                    controller: keyController,
+                    decoration: InputDecoration(labelText: 'Key Code'))),
+            ElevatedButton(
+                onPressed: _pressKey,
+                child: Text('Press to Simulate Keyboard Input')),
           ],
         ),
         SizedBox(height: 20),

@@ -37,7 +37,8 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   // Absolute mouse movement. x, y is the percentage of the screen ranged from 0 - 1.
   @override
-  Future<void> performMouseMoveAbsl(double percentx, double percenty, int screenId) async {
+  Future<void> performMouseMoveAbsl(
+      double percentx, double percenty, int screenId) async {
     await methodChannel.invokeMethod('mouseMoveA', {
       'x': percentx,
       'y': percenty,
