@@ -13,7 +13,13 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
     case "getPlatformVersion":
       result("macOS " + ProcessInfo.processInfo.operatingSystemVersionString)
     default:
-      result(FlutterMethodNotImplemented)
+      print("Hardware Simulator: Method called but not implemented: \(call.method)")
+      if let arguments = call.arguments {
+          print("Arguments: \(arguments)")
+      } else {
+          print("No arguments provided.")
+      }
+      result(nil);
     }
   }
 }
