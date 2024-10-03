@@ -38,6 +38,26 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.getPlatformVersion();
   }
 
+  static Future<int?> getMonitorCount() async {
+    return HardwareSimulatorPlatform.instance.getMonitorCount();
+  }
+  
+  static Future<void> lockCursor() async {
+    return HardwareSimulatorPlatform.instance.lockCursor();
+  }
+
+  static Future<void> unlockCursor() async {
+    return HardwareSimulatorPlatform.instance.unlockCursor();
+  }
+
+  static void addCursorMoved(CursorMovedCallback callback) {
+    HardwareSimulatorPlatform.instance.addCursorMoved(callback);
+  }
+
+  static void removeCursorMoved(CursorMovedCallback callback) {
+    HardwareSimulatorPlatform.instance.removeCursorMoved(callback);
+  }
+
   HWKeyboard getKeyboard() {
     return keyboard;
   }

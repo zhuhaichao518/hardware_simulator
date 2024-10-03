@@ -2,6 +2,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'hardware_simulator_method_channel.dart';
 
+typedef CursorMovedCallback = void Function(double x, double y);
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
   HardwareSimulatorPlatform() : super(token: _token);
@@ -25,6 +26,29 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
 
   Future<String?> getPlatformVersion() {
     throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  Future<int?> getMonitorCount() async {
+    // if not implemented, just care about main monitor.
+    return 1;
+  }
+
+  Future<void> lockCursor() async {
+    // if not implemented, just care about main monitor.
+    print("lockCursor called but not supported.");
+  }
+
+  Future<void> unlockCursor() async {
+    // if not implemented, just care about main monitor.
+    print("unlockCursor called but not supported.");
+  }
+
+  void addCursorMoved(CursorMovedCallback callback) async {
+    print("addCursorMoved called but not supported.");
+  }
+
+  void removeCursorMoved(CursorMovedCallback callback) {
+    print("removeCursorMoved called but not supported.");
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {

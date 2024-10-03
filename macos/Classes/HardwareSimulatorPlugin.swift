@@ -2,9 +2,12 @@ import Cocoa
 import FlutterMacOS
 
 public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
+  private var methodChannel: FlutterMethodChannel?
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "hardware_simulator", binaryMessenger: registrar.messenger)
     let instance = HardwareSimulatorPlugin()
+    instance.methodChannel = channel
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
@@ -30,10 +33,40 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       moveEvent?.post(tap: .cghidEventTap)
   }
 
+  var monitor: Any?
+    
+  // 监听鼠标移动并解耦鼠标和光标
+  func startTrackingMouse() {
+      monitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { event -> NSEvent? in
+          self.handleMouseMove(event)
+          return event
+      }
+  }
+  
+  // 停止监听
+  func stopTrackingMouse() {
+      if let monitor = monitor {
+          NSEvent.removeMonitor(monitor)
+      }
+  }
+  
+  // 处理鼠标移动事件
+  private func handleMouseMove(_ event: NSEvent) {
+      let deltaX = event.deltaX
+      let deltaY = event.deltaY
+      
+      methodChannel?.invokeMethod("onCursorMoved", arguments: [
+          "dx": deltaX,
+          "dy": deltaY,
+      ])
+  }
+
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "getPlatformVersion":
       result("macOS " + ProcessInfo.processInfo.operatingSystemVersionString)
+    case "getMonitorCount":
+      result(NSScreen.screens.count)
     case "mouseMoveA":
       if let args = call.arguments as? [String: Any],
         let percentX = args["x"] as? Double,
@@ -45,6 +78,14 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       } else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments", details: nil))
       }
+    case "lockCursor":
+      CGAssociateMouseAndMouseCursorPosition(0)
+      startTrackingMouse()
+      result(nil)
+    case "unlockCursor":
+      CGAssociateMouseAndMouseCursorPosition(1)
+      stopTrackingMouse()
+      result(nil)
     default:
       print("Hardware Simulator: Method called but not implemented: \(call.method)")
       if let arguments = call.arguments {
