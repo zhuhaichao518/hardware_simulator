@@ -33,6 +33,32 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       moveEvent?.post(tap: .cghidEventTap)
   }
 
+  func performMouseMoveRelative(dx: Double, dy: Double, screenId: Int) {
+      let screens = NSScreen.screens
+      guard screens.indices.contains(screenId) else {
+          print("Invalid screenId: \(screenId)")
+          return
+      }
+
+      let targetScreen = screens[screenId]
+      let screenFrame = targetScreen.frame
+
+      // Get the current mouse location
+      if let currentMouseLocation = CGEvent(source: nil)?.location {
+          // Calculate new position based on dx and dy
+          let newX = currentMouseLocation.x + CGFloat(dx)
+          let newY = currentMouseLocation.y + CGFloat(dy)
+
+          // Ensure the new coordinates are within the screen's bounds
+          let clampedX = min(max(newX, screenFrame.minX), screenFrame.maxX)
+          let clampedY = min(max(newY, screenFrame.minY), screenFrame.maxY)
+
+          // Create and post the event to move the mouse
+          let moveEvent = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: clampedX, y: clampedY), mouseButton: .left)
+          moveEvent?.post(tap: .cghidEventTap)
+      }
+  }
+
   var monitor: Any?
     
   // 监听鼠标移动并解耦鼠标和光标
@@ -78,12 +104,25 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       } else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments", details: nil))
       }
+    case "mouseMoveR":
+      if let args = call.arguments as? [String: Any],
+        let percentX = args["x"] as? Double,
+        let percentY = args["y"] as? Double,
+        let screenId = args["screenId"] as? Int {
+        // 调用鼠标移动函数
+        performMouseMoveRelative(dx: percentX, dy: percentY, screenId:screenId)
+        result(nil) // 表示成功执行，不返回值
+      } else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments", details: nil))
+      }
     case "lockCursor":
       CGAssociateMouseAndMouseCursorPosition(0)
+      NSCursor.hide()
       startTrackingMouse()
       result(nil)
     case "unlockCursor":
       CGAssociateMouseAndMouseCursorPosition(1)
+      NSCursor.unhide()
       stopTrackingMouse()
       result(nil)
     default:
