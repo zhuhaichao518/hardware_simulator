@@ -74,7 +74,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     await methodChannel.invokeMethod('mouseMoveR', {
       'x': deltax,
       'y': deltay,
-      'screenid': screenId,
+      'screenId': screenId,
     });
   }
 
