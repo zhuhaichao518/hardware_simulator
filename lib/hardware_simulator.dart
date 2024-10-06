@@ -41,7 +41,7 @@ class HardwareSimulator {
   static Future<int?> getMonitorCount() async {
     return HardwareSimulatorPlatform.instance.getMonitorCount();
   }
-  
+
   static Future<void> lockCursor() async {
     return HardwareSimulatorPlatform.instance.lockCursor();
   }

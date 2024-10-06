@@ -13,8 +13,8 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   void init() {
     methodChannel.setMethodCallHandler((call) async {
       if (call.method == "onCursorMoved") {
-        for (var callback in _callbacks){
-           callback(call.arguments['dx'],call.arguments['dy']);
+        for (var callback in _callbacks) {
+          callback(call.arguments['dx'], call.arguments['dy']);
         }
       }
       return null;
