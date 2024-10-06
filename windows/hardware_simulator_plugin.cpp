@@ -87,7 +87,7 @@ void send_input(INPUT& i) {
     }
 }
 
-void button_mouse(int button, bool release) {
+void performMouseButton(int button, bool release) {
     //SHORT KEY_STATE_DOWN = 0x8000;
 
     INPUT i{};
@@ -252,6 +252,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto percentx = (args->find(flutter::EncodableValue("x")))->second;
         auto percenty = (args->find(flutter::EncodableValue("y")))->second;
         performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("mousePress") == 0) {
+        auto buttonid = (args->find(flutter::EncodableValue("buttonid")))->second;
+        auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
+        performMouseButton(static_cast<int>(std::get<int>((buttonid))), !static_cast<bool>(std::get<bool>((isDown))));
         result->Success(nullptr);
   }
   else {
