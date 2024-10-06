@@ -172,6 +172,39 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       }
   }
 
+  func performMouseButton(buttonId: Int, isDown: Bool) {
+      let eventSource = CGEventSource(stateID: .hidSystemState)
+
+      var mouseEventType: CGEventType
+      var mouseButton: CGMouseButton
+      
+      // 根据 buttonId 确定是左键还是右键
+      if buttonId == 1 {
+          mouseButton = .left
+          mouseEventType = isDown ? .leftMouseDown : .leftMouseUp
+      } else if buttonId == 3 {
+          mouseButton = .right
+          mouseEventType = isDown ? .rightMouseDown : .rightMouseUp
+      } else {
+          print("Unsupported buttonId")
+          return
+      }
+      
+      // 获取当前鼠标位置
+      if let currentLocation = CGEvent(source: nil)?.location {
+          // 创建鼠标事件
+          let mouseEvent = CGEvent(mouseEventSource: eventSource, 
+                                  mouseType: mouseEventType, 
+                                  mouseCursorPosition: currentLocation, 
+                                  mouseButton: mouseButton)
+          
+          // 发送事件
+          mouseEvent?.post(tap: .cghidEventTap)
+      } else {
+          print("Failed to get current mouse location")
+      }
+  }
+
   var monitor: Any?
     
   // 监听鼠标移动并解耦鼠标和光标
@@ -199,12 +232,33 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           "dy": deltaY,
       ])
   }
+  
+  var activities: [String: NSObjectProtocol] = [:]
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "getPlatformVersion":
       result("macOS " + ProcessInfo.processInfo.operatingSystemVersionString)
+    case "beginActivity":
+      let key = UUID().uuidString
+      let reason = call.arguments as? String ?? "Prevent nap to do an important task."
+      let activity = ProcessInfo.processInfo.beginActivity(options: [.idleDisplaySleepDisabled, .userInitiated], reason: reason)
+      activities[key] = activity
+      result(key)
+    case "endActivity":
+      let key = call.arguments as? String ?? ""
+      if let activity = activities[key] {
+        ProcessInfo.processInfo.endActivity(activity)
+        activities[key] = nil 
+        result(true)
+        return
+      }
+      result(FlutterError(code: "Unknown Activity", message: nil, details: nil))
     case "getMonitorCount":
+      let key = UUID().uuidString
+      let reason = call.arguments as? String ?? "Prevent nap to do an important task."
+      let activity = ProcessInfo.processInfo.beginActivity(options: [.idleDisplaySleepDisabled, .userInitiated], reason: reason)
+      activities[key] = activity
       result(NSScreen.screens.count)
     case "mouseMoveA":
       if let args = call.arguments as? [String: Any],
@@ -227,6 +281,16 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         result(nil) // 表示成功执行，不返回值
       } else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for MouseMove Relative", details: nil))
+      }
+    case "mousePress":
+      if let args = call.arguments as? [String: Any],
+        let buttonId = args["buttonId"] as? Int,
+        let isDown = args["isDown"] as? Bool {
+        // 调用鼠标移动函数
+        performMouseButton(buttonId: buttonId, isDown: isDown)
+        result(nil) // 表示成功执行，不返回值
+      } else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for Mouse Oress", details: nil))
       }
     case "KeyPress":
         if let args = call.arguments as? [String: Any],

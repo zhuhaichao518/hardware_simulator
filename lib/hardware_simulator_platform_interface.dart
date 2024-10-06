@@ -3,6 +3,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'hardware_simulator_method_channel.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
+
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
   HardwareSimulatorPlatform() : super(token: _token);

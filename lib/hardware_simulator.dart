@@ -18,7 +18,8 @@ class HWMouse {
     HardwareSimulatorPlatform.instance
         .performMouseMoveAbsl(percentx, percenty, screenId);
   }
-
+  
+  // mouse left button id 1, right button id 3
   void performMouseClick(int buttonId, bool isDown) {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);
   }
@@ -41,7 +42,7 @@ class HardwareSimulator {
   static Future<int?> getMonitorCount() async {
     return HardwareSimulatorPlatform.instance.getMonitorCount();
   }
-  
+
   static Future<void> lockCursor() async {
     return HardwareSimulatorPlatform.instance.lockCursor();
   }
