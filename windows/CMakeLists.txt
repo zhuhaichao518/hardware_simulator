@@ -20,6 +20,8 @@ set(PLUGIN_NAME "hardware_simulator_plugin")
 list(APPEND PLUGIN_SOURCES
   "hardware_simulator_plugin.cpp"
   "hardware_simulator_plugin.h"
+  "cursor_monitor.cc"
+  "cursor_monitor.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment

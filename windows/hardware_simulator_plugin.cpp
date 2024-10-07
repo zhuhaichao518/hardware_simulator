@@ -1,5 +1,7 @@
 #include "hardware_simulator_plugin.h"
 
+#include "cursor_monitor.h"
+
 // This must be included before many other Windows headers.
 #include <windows.h>
 
@@ -254,9 +256,34 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
         result->Success(nullptr);
   } else if (method_call.method_name().compare("mousePress") == 0) {
-        auto buttonid = (args->find(flutter::EncodableValue("buttonid")))->second;
+        auto buttonid = (args->find(flutter::EncodableValue("buttonId")))->second;
         auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
         performMouseButton(static_cast<int>(std::get<int>((buttonid))), !static_cast<bool>(std::get<bool>((isDown))));
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("hookCursorImage") == 0) {
+        //TODO:add logic here
+        CursorMonitor::startHook([](int message, int msg_info, const std::vector<uint8_t>& bytes) {
+            int b;
+            switch (message) {
+            case CURSOR_INVISIBLE:
+                b = 0;
+                break;
+            case CURSOR_VISIBLE:
+                b = 0;
+                break;
+            case CURSOR_UPDATED_DEFAULT:
+                b = 0;
+                break;
+            case CURSOR_UPDATED_IMAGE:
+            {
+                b = 0;
+                break;
+            }
+            case CURSOR_UPDATED_CACHED:
+                b = 0;
+                break;
+            }
+        });
         result->Success(nullptr);
   }
   else {
