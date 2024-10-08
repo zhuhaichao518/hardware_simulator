@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'hardware_simulator_platform_interface.dart';
 
 class HWKeyboard {
@@ -57,6 +59,25 @@ class HardwareSimulator {
 
   static void removeCursorMoved(CursorMovedCallback callback) {
     HardwareSimulatorPlatform.instance.removeCursorMoved(callback);
+  }
+
+  // ignore: constant_identifier_names
+  static const int CURSOR_INVISIBLE = 1;
+  // ignore: constant_identifier_names
+  static const int CURSOR_VISIBLE = 2;
+  // ignore: constant_identifier_names
+  static const int CURSOR_UPDATED_DEFAULT = 3;
+  // ignore: constant_identifier_names
+  static const int CURSOR_UPDATED_IMAGE = 4;
+  // ignore: constant_identifier_names
+  static const int CURSOR_UPDATED_CACHED = 5;
+
+  static void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
+    HardwareSimulatorPlatform.instance.addCursorImageUpdated(callback, callbackId);
+  }
+
+  static void removeCursorImageUpdated(int callbackId) {
+    HardwareSimulatorPlatform.instance.removeCursorImageUpdated(callbackId);
   }
 
   HWKeyboard getKeyboard() {

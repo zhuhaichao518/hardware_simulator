@@ -284,8 +284,8 @@ std::vector<uint8_t> ConvertUint32ToUint8(const uint32_t* inputArray,
     outputArray.reserve(width * height * sizeof(uint32_t) + sizeof(hash) * 3 +
         1);
 
-    // 0 means it is cursor data.
-    outputArray.push_back(static_cast<uint8_t>(0));
+    // 9 means it is cursor data. This is used by CloudPlayPlus.
+    outputArray.push_back(static_cast<uint8_t>(9));
 
     // Add size mark
     uint8_t* wBytes = reinterpret_cast<uint8_t*>(&width);
@@ -383,7 +383,7 @@ void SyncCursorImage() {
     HANDLE h = GetCursorHandle(ci.hCursor);
     if (h != NULL) {
         for (auto callback : callbacks) {
-            callback.second(CURSOR_UPDATED_DEFAULT, reinterpret_cast<intptr_t>(h), {});
+            callback.second(CURSOR_UPDATED_DEFAULT, (int)reinterpret_cast<intptr_t>(h), {});
         }
     }
     else {

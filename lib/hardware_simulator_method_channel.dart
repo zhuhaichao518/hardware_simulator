@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -13,8 +15,14 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   void init() {
     methodChannel.setMethodCallHandler((call) async {
       if (call.method == "onCursorMoved") {
-        for (var callback in _callbacks) {
+        for (var callback in cursorMovedCallbacks) {
           callback(call.arguments['dx'], call.arguments['dy']);
+        }
+      }
+      if (call.method == "onCursorImageMessage") {
+        int callbackID = call.arguments['callbackID'];
+        if (cursorImageCallbacks.containsKey(callbackID)){
+          cursorImageCallbacks[callbackID]!(call.arguments['message'],call.arguments['msg_info'],call.arguments['cursorImage']);
         }
       }
       return null;
@@ -42,21 +50,49 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<int?> getMonitorCount() async {
+    if (kIsWeb || Platform.isAndroid || Platform.isIOS) return 1;
     final count = await methodChannel.invokeMethod('getMonitorCount');
     return count;
   }
 
-  final List<CursorMovedCallback> _callbacks = [];
+  final List<CursorMovedCallback> cursorMovedCallbacks = [];
 
   @override
   void addCursorMoved(CursorMovedCallback callback) {
     if (!isinitialized) init();
-    _callbacks.add(callback);
+    cursorMovedCallbacks.add(callback);
   }
 
   @override
   void removeCursorMoved(CursorMovedCallback callback) {
-    _callbacks.remove(callback);
+    cursorMovedCallbacks.remove(callback);
+  }
+  
+  final Map<int,CursorImageUpdatedCallback> cursorImageCallbacks = {};
+
+  @override
+  void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
+    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
+    if (!isinitialized) init();
+    cursorImageCallbacks[callbackId] = callback;
+    methodChannel.invokeMethod('hookCursorImage', {
+      'callbackID': callbackId,
+    });
+  }
+  
+  @override
+  void removeCursorImageUpdated(int callbackId) {
+    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
+    if (cursorImageCallbacks.containsKey(callbackId)){
+      cursorImageCallbacks.remove(callbackId);
+    }
+    methodChannel.invokeMethod('unhookCursorImage', {
+      'callbackID': callbackId,
+    });
   }
 
   @override

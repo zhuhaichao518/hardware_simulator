@@ -28,7 +28,9 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
 
   auto plugin = std::make_unique<HardwareSimulatorPlugin>();
 
-  channel->SetMethodCallHandler(
+  plugin->channel_ = std::move(channel);
+
+  plugin->channel_->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto &call, auto result) {
         plugin_pointer->HandleMethodCall(call, std::move(result));
       });
@@ -261,29 +263,22 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         performMouseButton(static_cast<int>(std::get<int>((buttonid))), !static_cast<bool>(std::get<bool>((isDown))));
         result->Success(nullptr);
   } else if (method_call.method_name().compare("hookCursorImage") == 0) {
-        //TODO:add logic here
-        CursorMonitor::startHook([](int message, int msg_info, const std::vector<uint8_t>& bytes) {
-            int b;
-            switch (message) {
-            case CURSOR_INVISIBLE:
-                b = 0;
-                break;
-            case CURSOR_VISIBLE:
-                b = 0;
-                break;
-            case CURSOR_UPDATED_DEFAULT:
-                b = 0;
-                break;
-            case CURSOR_UPDATED_IMAGE:
-            {
-                b = 0;
-                break;
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::startHook([this, callbackID](int message, int msg_info, const std::vector<uint8_t>& cursorImage) {
+            flutter::EncodableMap encoded_message;
+            encoded_message[flutter::EncodableValue("callbackID")] = flutter::EncodableValue(callbackID);
+            encoded_message[flutter::EncodableValue("message")] = flutter::EncodableValue(message);
+            encoded_message[flutter::EncodableValue("msg_info")] = flutter::EncodableValue(msg_info);
+            encoded_message[flutter::EncodableValue("cursorImage")] = flutter::EncodableValue(std::vector<uint8_t>(cursorImage.begin(), cursorImage.end()));
+            if (channel_) {
+                channel_->InvokeMethod("onCursorImageMessage", 
+                    std::make_unique<flutter::EncodableValue>(encoded_message));
             }
-            case CURSOR_UPDATED_CACHED:
-                b = 0;
-                break;
-            }
-        });
+        }, callbackID);
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("unhookCursorImage") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::endHook(callbackID);
         result->Success(nullptr);
   }
   else {

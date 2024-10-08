@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui show Image,
+        decodeImageFromPixels,
+        PixelFormat;
 import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
+
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(MyApp());
@@ -58,6 +64,75 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           .performKeyEvent(keyCode, false); // Release
     });
   }
+  
+  ui.Image? image;
+
+  Map<int,ui.Image> cached_images = {};
+  
+  Future<ui.Image> rawBGRAtoImage(
+      Uint8List bytes, int width, int height) async {
+    final Completer<ui.Image> completer = Completer();
+    ui.decodeImageFromPixels(
+      bytes,
+      width,
+      height,
+      ui.PixelFormat.bgra8888,
+      (ui.Image img) {
+        return completer.complete(img);
+      },
+    );
+    return completer.future;
+  }
+
+  void updateCursorImage(Uint8List message, int width, int height, int hash) {
+    rawBGRAtoImage(message, width, height).then((ui.Image img) {
+      setState(() {
+        cached_images[hash] = img;
+        image = img; // 在setState中更新image
+      });
+    });
+  }
+
+  void _registerCursorChanged() async{
+    HardwareSimulator.addCursorImageUpdated((int message, int messageInfo, Uint8List cursorImage){
+      if (message == HardwareSimulator.CURSOR_UPDATED_IMAGE){
+        //cursor hash: 0 + size + hash + data
+        int width = 0;
+        int height = 0;
+        int hash = 0;
+        int hotx = 0;
+        int hoty = 0;
+        //We may use the 0 bit for future use to indicate some image type.
+        if (cursorImage[0] == 9) {
+          //cursor bitmap
+          for (int i = 1; i < 5; i++) {
+            width = width * 256 + cursorImage[i];
+          }
+          for (int i = 5; i < 9; i++) {
+            height = height * 256 + cursorImage[i];
+          }
+          for (int i = 9; i < 13; i++) {
+            hotx = hotx * 256 + cursorImage[i];
+          }
+          for (int i = 13; i < 17; i++) {
+            hoty = hoty * 256 + cursorImage[i];
+          }
+          for (int i = 17; i < 21; i++) {
+            hash = hash * 256 + cursorImage[i];
+          }
+          updateCursorImage(cursorImage.sublist(21), width, height, hash);
+        }
+      }else if (message == HardwareSimulator.CURSOR_UPDATED_CACHED){
+        setState(() {
+          image = cached_images[messageInfo]; // 在setState中更新image
+        });
+      }
+    },1);
+  }
+
+  void _unregisterCursorChanged() async{
+    HardwareSimulator.removeCursorImageUpdated(1);
+  }
 
   FocusNode? _textFieldFocusNode;
 
@@ -70,11 +145,16 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void dispose() {
     _textFieldFocusNode?.dispose();
+    _unregisterCursorChanged();
     super.dispose();
   }
 
   void _transferFocus() {
     FocusScope.of(context).requestFocus(_textFieldFocusNode);
+  }
+
+  void _openWebPage() async {
+    await launchUrl(Uri.parse('https://timmaffett.github.io/custom_mouse_cursor/#/'));
   }
 
   @override
@@ -139,7 +219,48 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             hintText: 'Simulated keyboard input',
           ),
         ),
+        SizedBox(height: 20),
+        // Second Row: Relative Mouse Move
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+                child: image == null
+              ? CircularProgressIndicator()
+              : CustomPaint(
+                  painter: ImagePainter(image!),
+                  size: Size(image!.width.toDouble(), image!.height.toDouble()),
+                )),
+            ElevatedButton(
+              //https://timmaffett.github.io/custom_mouse_cursor/#/
+                onPressed: _openWebPage,
+                child: Text('open test cursor web')),
+            ElevatedButton(
+                onPressed: _registerCursorChanged,
+                child: Text('register CursorImageChanged')),
+            ElevatedButton(
+                onPressed: _unregisterCursorChanged,
+                child: Text('unregister CursorImageChanged')),
+          ],
+        ),
       ],
     );
+  }
+}
+
+class ImagePainter extends CustomPainter {
+  final ui.Image image;
+
+  ImagePainter(this.image);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 在画布上绘制图片
+    canvas.drawImage(image, Offset.zero, Paint());
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }
