@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'hardware_simulator_platform_interface.dart';
 
 class HWKeyboard {
