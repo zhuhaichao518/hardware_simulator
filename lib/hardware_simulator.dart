@@ -18,7 +18,7 @@ class HWMouse {
     HardwareSimulatorPlatform.instance
         .performMouseMoveAbsl(percentx, percenty, screenId);
   }
-  
+
   // mouse left button id 1, right button id 3
   void performMouseClick(int buttonId, bool isDown) {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);
@@ -35,6 +35,8 @@ class HardwareSimulator {
   static HWKeyboard keyboard = HWKeyboard();
   static HWMouse mouse = HWMouse();
 
+  static bool cursorlocked = false;
+
   Future<String?> getPlatformVersion() {
     return HardwareSimulatorPlatform.instance.getPlatformVersion();
   }
@@ -44,10 +46,13 @@ class HardwareSimulator {
   }
 
   static Future<void> lockCursor() async {
+    cursorlocked = true;
     return HardwareSimulatorPlatform.instance.lockCursor();
   }
 
   static Future<void> unlockCursor() async {
+    if (!cursorlocked) return;
+    cursorlocked = false;
     return HardwareSimulatorPlatform.instance.unlockCursor();
   }
 
@@ -70,8 +75,10 @@ class HardwareSimulator {
   // ignore: constant_identifier_names
   static const int CURSOR_UPDATED_CACHED = 5;
 
-  static void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
-    HardwareSimulatorPlatform.instance.addCursorImageUpdated(callback, callbackId);
+  static void addCursorImageUpdated(
+      CursorImageUpdatedCallback callback, int callbackId) {
+    HardwareSimulatorPlatform.instance
+        .addCursorImageUpdated(callback, callbackId);
   }
 
   static void removeCursorImageUpdated(int callbackId) {

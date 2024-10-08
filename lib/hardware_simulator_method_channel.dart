@@ -21,8 +21,9 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       }
       if (call.method == "onCursorImageMessage") {
         int callbackID = call.arguments['callbackID'];
-        if (cursorImageCallbacks.containsKey(callbackID)){
-          cursorImageCallbacks[callbackID]!(call.arguments['message'],call.arguments['msg_info'],call.arguments['cursorImage']);
+        if (cursorImageCallbacks.containsKey(callbackID)) {
+          cursorImageCallbacks[callbackID]!(call.arguments['message'],
+              call.arguments['msg_info'], call.arguments['cursorImage']);
         }
       }
       return null;
@@ -67,11 +68,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   void removeCursorMoved(CursorMovedCallback callback) {
     cursorMovedCallbacks.remove(callback);
   }
-  
-  final Map<int,CursorImageUpdatedCallback> cursorImageCallbacks = {};
+
+  final Map<int, CursorImageUpdatedCallback> cursorImageCallbacks = {};
 
   @override
-  void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
+  void addCursorImageUpdated(
+      CursorImageUpdatedCallback callback, int callbackId) {
     if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
       return;
     }
@@ -81,13 +83,13 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'callbackID': callbackId,
     });
   }
-  
+
   @override
   void removeCursorImageUpdated(int callbackId) {
     if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
       return;
     }
-    if (cursorImageCallbacks.containsKey(callbackId)){
+    if (cursorImageCallbacks.containsKey(callbackId)) {
       cursorImageCallbacks.remove(callbackId);
     }
     methodChannel.invokeMethod('unhookCursorImage', {
