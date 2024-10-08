@@ -12,8 +12,7 @@ using CursorChangedCallback = std::function<void(int, int, const std::vector<uin
 #define CURSOR_UPDATED_CACHED 5
 class CursorMonitor {
 public:
-    static CursorChangedCallback g_callback;
     static HWINEVENTHOOK Global_HOOK;
-    static void startHook(CursorChangedCallback callback);
-    static void endHook();
+    static void startHook(CursorChangedCallback callback, long long callback_id);
+    static void endHook(long long callback_id);
 };

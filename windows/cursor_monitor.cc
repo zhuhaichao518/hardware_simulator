@@ -4,13 +4,15 @@
 #include <string>
 #include <unordered_set>
 #include <cstring>
+#include <map>
 
 HWINEVENTHOOK CursorMonitor::Global_HOOK = nullptr;
-CursorChangedCallback CursorMonitor::g_callback = nullptr;
 // Constants (Define as needed)
 const int kBytesPerPixel = 4;
 
-std::unordered_set<uint32_t> cachedcursors = {};
+// Cached cursor to hash for a callback
+static std::map<long long, std::unordered_set<uint32_t>> cachedcursors;
+static std::map<long long, CursorChangedCallback> callbacks;
 
 bool HasAlphaChannel(const uint32_t* data, int stride, int width, int height) {
     const RGBQUAD* plane = reinterpret_cast<const RGBQUAD*>(data);
@@ -375,6 +377,41 @@ std::vector<uint8_t> ConvertUint32ToUint8(const uint32_t* inputArray,
     return outputArray;
 }
 
+void SyncCursorImage() {
+    CURSORINFO ci = { sizeof(ci) };
+    GetCursorInfo(&ci);
+    HANDLE h = GetCursorHandle(ci.hCursor);
+    if (h != NULL) {
+        for (auto callback : callbacks) {
+            callback.second(CURSOR_UPDATED_DEFAULT, reinterpret_cast<intptr_t>(h), {});
+        }
+    }
+    else {
+        HDC hdc = GetDC(nullptr);
+        int width = 0, height = 0, hotX = 0, hotY = 0;
+        std::unique_ptr<uint32_t[]> image = std::move(
+            CreateMouseCursorFromHCursor(hdc, ci.hCursor, &width, &height, &hotX, &hotY));
+        ReleaseDC(nullptr, hdc);
+
+        unsigned int hash = JSHash(image.get(), width * height);
+
+        std::vector<uint8_t> datawith8bitbytes = {};
+        for (auto callback : callbacks) {
+            if (cachedcursors[callback.first].find(hash) != cachedcursors[callback.first].end()) {
+                callback.second(CURSOR_UPDATED_CACHED, hash, {});
+            }
+            else {
+                if (datawith8bitbytes.size() == 0) {
+                    datawith8bitbytes =
+                        ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
+                }
+                cachedcursors[callback.first].insert(hash);
+                callback.second(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
+            }
+        }
+    }
+}
+
 void CursorChangedEventProc(HWINEVENTHOOK hook,
     DWORD event,
     HWND hwnd,
@@ -386,38 +423,19 @@ void CursorChangedEventProc(HWINEVENTHOOK hook,
         std::string str;
         switch (event) {
         case EVENT_OBJECT_HIDE:
-            CursorMonitor::g_callback(CURSOR_INVISIBLE, 0, {});
+            for (auto callback : callbacks) {
+                callback.second(CURSOR_INVISIBLE, 0, {});
+            }
             break;
         case EVENT_OBJECT_SHOW:
-            CursorMonitor::g_callback(CURSOR_VISIBLE, 0, {});
+            for (auto callback : callbacks) {
+                callback.second(CURSOR_VISIBLE, 0, {});
+            }
+            SyncCursorImage();
             break;
         case EVENT_OBJECT_NAMECHANGE:
         {
-            CURSORINFO ci = { sizeof(ci) };
-            GetCursorInfo(&ci);
-            HANDLE h = GetCursorHandle(ci.hCursor);
-            if (h != NULL) {
-                CursorMonitor::g_callback(CURSOR_UPDATED_DEFAULT, (int)reinterpret_cast<intptr_t>(h), {});
-            }
-            else {
-                HDC hdc = GetDC(nullptr);
-                int width = 0, height = 0, hotX = 0, hotY = 0;
-                std::unique_ptr<uint32_t[]> image = std::move(
-                    CreateMouseCursorFromHCursor(hdc, ci.hCursor, &width, &height, &hotX, &hotY));
-                ReleaseDC(nullptr, hdc);
-
-                unsigned int hash = JSHash(image.get(), width * height);
-
-                if (cachedcursors.find(hash) != cachedcursors.end()) {
-                    CursorMonitor::g_callback(CURSOR_UPDATED_CACHED, hash, {});
-                }
-                else {
-                    cachedcursors.insert(hash);
-                    std::vector<uint8_t> datawith8bitbytes =
-                        ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
-                    CursorMonitor::g_callback(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
-                }
-            }
+            SyncCursorImage();
             break;
         }
         default:
@@ -426,15 +444,21 @@ void CursorChangedEventProc(HWINEVENTHOOK hook,
     }
 }
 
-void CursorMonitor::startHook(CursorChangedCallback callback) {
-    g_callback = callback;
-    Global_HOOK = SetWinEventHook(
-        EVENT_OBJECT_SHOW, EVENT_OBJECT_NAMECHANGE,
-        nullptr, CursorChangedEventProc, 0, 0,
-        WINEVENT_OUTOFCONTEXT);
+void CursorMonitor::startHook(CursorChangedCallback callback, long long callback_id) {
+    if (callbacks.empty()) {
+        Global_HOOK = SetWinEventHook(
+            EVENT_OBJECT_SHOW, EVENT_OBJECT_NAMECHANGE,
+            nullptr, CursorChangedEventProc, 0, 0,
+            WINEVENT_OUTOFCONTEXT);
+    }
+    callbacks[callback_id] = callback;
+    cachedcursors[callback_id] = {};
 }
 
-void CursorMonitor::endHook() {
-    UnhookWinEvent(Global_HOOK);
-    cachedcursors.clear();
+void CursorMonitor::endHook(long long callback_id) {
+    callbacks.erase(callbacks.find(callback_id));
+    cachedcursors.erase(cachedcursors.find(callback_id));
+    if (callbacks.empty()) {
+        UnhookWinEvent(Global_HOOK);
+    }
 }
