@@ -141,7 +141,15 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       let screenDiff = Double(screenFrame.height) - Double(screens[0].frame.height)
       // Haichao: It seems this is how macos works for Y. I don't know why it is so strange.
       let absoluteY = heightFactor - (yOffset + screenDiff)
-      let moveEvent = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: absoluteX, y: absoluteY), mouseButton: .left)
+
+      var eventType: CGEventType = .mouseMoved
+      let pressedButtons = NSEvent.pressedMouseButtons
+      if pressedButtons & (1 << 0) != 0 {
+          eventType = .leftMouseDragged
+      } else if pressedButtons & (1 << 1) != 0 {
+          eventType = .rightMouseDragged
+      }
+      let moveEvent = CGEvent(mouseEventSource: nil, mouseType: eventType, mouseCursorPosition: CGPoint(x: absoluteX, y: absoluteY), mouseButton: .left)
 
       moveEvent?.post(tap: .cghidEventTap)
   }
@@ -155,6 +163,14 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
 
       let targetScreen = screens[screenId]
       let screenFrame = targetScreen.frame
+      
+      var eventType: CGEventType = .mouseMoved
+      let pressedButtons = NSEvent.pressedMouseButtons
+      if pressedButtons & (1 << 0) != 0 {
+          eventType = .leftMouseDragged
+      } else if pressedButtons & (1 << 1) != 0 {
+          eventType = .rightMouseDragged
+      }
 
       // Get the current mouse location
       if let currentMouseLocation = CGEvent(source: nil)?.location {
@@ -167,7 +183,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           let clampedY = min(max(newY, screenFrame.minY), screenFrame.maxY)
 
           // Create and post the event to move the mouse
-          let moveEvent = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: clampedX, y: clampedY), mouseButton: .left)
+          let moveEvent = CGEvent(mouseEventSource: nil, mouseType: eventType, mouseCursorPosition: CGPoint(x: clampedX, y: clampedY), mouseButton: .left)
           moveEvent?.post(tap: .cghidEventTap)
       }
   }
@@ -202,6 +218,18 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           mouseEvent?.post(tap: .cghidEventTap)
       } else {
           print("Failed to get current mouse location")
+      }
+  }
+
+  func performMouseScroll(dx: Double, dy: Double) {
+      let eventSource = CGEventSource(stateID: .hidSystemState)
+      
+      if dy != 0, let scrollEventY = CGEvent(scrollWheelEvent2Source: eventSource, units: .pixel, wheelCount: 1, wheel1: Int32(dy), wheel2: 0, wheel3: 0) {
+          scrollEventY.post(tap: .cghidEventTap)
+      }
+
+      if dx != 0, let scrollEventX = CGEvent(scrollWheelEvent2Source: eventSource, units: .pixel, wheelCount: 1, wheel1: 0, wheel2: Int32(dx), wheel3: 0) {
+          scrollEventX.post(tap: .cghidEventTap)
       }
   }
 
@@ -290,7 +318,17 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         performMouseButton(buttonId: buttonId, isDown: isDown)
         result(nil) // 表示成功执行，不返回值
       } else {
-        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for Mouse Oress", details: nil))
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for Mouse Press", details: nil))
+      }
+    case "mouseScroll":
+      if let args = call.arguments as? [String: Any],
+        let dx = args["dx"] as? Double,
+        let dy = args["dy"] as? Double {
+        // 调用鼠标移动函数
+        performMouseScroll(dx: dx, dy: dy)
+        result(nil) // 表示成功执行，不返回值
+      } else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for Mouse Scroll", details: nil))
       }
     case "KeyPress":
         if let args = call.arguments as? [String: Any],
