@@ -86,9 +86,6 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   void removeCursorImageUpdated(int callbackId) {
-    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
-      return;
-    }
     if (cursorImageCallbacks.containsKey(callbackId)) {
       cursorImageCallbacks.remove(callbackId);
     }

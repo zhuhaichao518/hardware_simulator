@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui show Image, decodeImageFromPixels, PixelFormat;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
@@ -37,6 +38,16 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   final HardwareSimulator hardwareSimulator = HardwareSimulator();
 
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      print('Key Down: ${event.logicalKey}');
+    } else if (event is KeyUpEvent) {
+      print('Key Up: ${event.logicalKey}');
+    } else {
+      print('repeat ${event.logicalKey}');
+    }
+    return true;
+  }
   void _moveMouseAbsolute() {
     double x = double.tryParse(xController.text) ?? 0;
     double y = double.tryParse(yController.text) ?? 0;
@@ -138,11 +149,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void initState() {
     super.initState();
+    // 监听硬件键盘事件
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _textFieldFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _textFieldFocusNode?.dispose();
     _unregisterCursorChanged();
     super.dispose();

@@ -92,6 +92,17 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
           }
       }
     });
+    
+    //This is a workaround for https://github.com/flutter/engine/pull/19632.
+    //You also need to care about engine/src/flutter/lib/web_ui/lib/src/engine/keyboard_binding.dart
+    //to cancel the guard. CloudPlayPlus does not need this, you can do it as you like.
+    //Currently I don't know why the fix does not work for my macbook.
+    /*document.onKeyDown.listen((event){
+      for (var callback in keyPressedCallbacks){
+        callback(event.keyCode,true);
+      }
+    });*/
+
     isinitialized = true;
   }
 
