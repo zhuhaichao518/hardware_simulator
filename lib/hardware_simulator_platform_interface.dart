@@ -55,56 +55,56 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   void removeCursorMoved(CursorMovedCallback callback) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('removeCursorMoved() has not been implemented.');
   }
 
   void addCursorPressed(CursorPressedCallback callback) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('addCursorPressed() has not been implemented.');
   }
 
   void removeCursorPressed(CursorPressedCallback callback) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('removeCursorPressed() has not been implemented.');
   }
 
   void addCursorWheel(CursorWheelCallback callback) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('addCursorWheel() has not been implemented.');
   }
 
   void removeCursorWheel(CursorWheelCallback callback) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('removeCursorWheel() has not been implemented.');
   }
 
   void addCursorImageUpdated(
       CursorImageUpdatedCallback callback, int callbackId) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('addCursorImageUpdated() has not been implemented.');
   }
 
   void removeCursorImageUpdated(int callbackId) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('removeCursorImageUpdated() has not been implemented.');
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performKeyEvent() has not been implemented.');
   }
 
   // Relative mouse movement.
   Future<void> performMouseMoveRelative(
       double deltax, double deltay, int screenId) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performMouseMoveRelative() has not been implemented.');
   }
 
   // Absolute mouse movement. x, y is the percentage of the screen ranged from 0 - 1.
   Future<void> performMouseMoveAbsl(
       double percentx, double percenty, int screenId) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performMouseMoveAbsl() has not been implemented.');
   }
 
   Future<void> performMouseClick(int buttonId, bool isDown) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performMouseClick() has not been implemented.');
   }
 
   // Direction 0:vertial 1:horizontal
   Future<void> performMouseScroll(int direction, int delta) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performMouseScroll() has not been implemented.');
   }
 }
