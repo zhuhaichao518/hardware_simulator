@@ -5,6 +5,8 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'hardware_simulator_method_channel.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
+typedef CursorPressedCallback = void Function(int button, bool isDown);
+typedef CursorWheelCallback = void Function(double deltaX, double deltaY);
 typedef CursorImageUpdatedCallback = void Function(
     int message, int messageInfo, Uint8List cursorImage);
 
@@ -53,7 +55,23 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   void removeCursorMoved(CursorMovedCallback callback) {
-    print("removeCursorMoved called but not supported.");
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  void addCursorPressed(CursorPressedCallback callback) {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  void removeCursorPressed(CursorPressedCallback callback) {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  void addCursorWheel(CursorWheelCallback callback) {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  void removeCursorWheel(CursorWheelCallback callback) {
+    throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
   void addCursorImageUpdated(

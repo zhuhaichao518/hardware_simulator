@@ -64,6 +64,14 @@ class HardwareSimulator {
     HardwareSimulatorPlatform.instance.removeCursorMoved(callback);
   }
 
+  static void addCursorPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.addCursorPressed(callback);
+  }
+
+  static void removeCursorPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.removeCursorPressed(callback);
+  }
+
   // ignore: constant_identifier_names
   static const int CURSOR_INVISIBLE = 1;
   // ignore: constant_identifier_names

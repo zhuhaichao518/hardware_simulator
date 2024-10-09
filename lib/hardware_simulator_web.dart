@@ -26,6 +26,15 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
   }
 
   @override
+  Future<int?> getMonitorCount() async {
+    //顺便取消右键菜单
+    document.onContextMenu.listen((event) {
+      event.preventDefault(); // 阻止默认的右键菜单
+    });
+    return 1;
+  }
+
+  @override
   Future<void> lockCursor() async {
     js_util.callMethod(document.body!, 'requestPointerLock', []);
   }
@@ -36,6 +45,11 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
   }
 
   bool isinitialized = false;
+  
+  Map<int, int> webToWindowsMouseButtonMap = {
+    0: 1, //leftbutton
+    2: 3, //rightbutton
+  };
 
   void init() {
     // 监听鼠标移动事件
@@ -45,6 +59,34 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
       double dy = event.movement.y.toDouble();
       for (var callback in cursorMovedCallbacks){
         callback(dx,dy);
+      }
+    });
+
+    document.onMouseWheel.listen((event) {
+      double dx = event.deltaX.toDouble();
+      double dy = event.deltaY.toDouble();
+      for (var callback in cursorWheelCallbacks){
+        callback(dx,dy);
+      }
+    });
+    
+    document.onMouseDown.listen((event) {
+      int buttonId = event.button;
+      if (webToWindowsMouseButtonMap.containsKey(buttonId)){
+          buttonId = webToWindowsMouseButtonMap[buttonId]!;
+      }
+      for (var callback in cursorPressedCallbacks){
+        callback(buttonId,true);
+      }
+    });
+
+    document.onMouseUp.listen((event) {
+      int buttonId = event.button;
+      if (webToWindowsMouseButtonMap.containsKey(buttonId)){
+          buttonId = webToWindowsMouseButtonMap[buttonId]!;
+          for (var callback in cursorPressedCallbacks){
+            callback(buttonId,false);
+          }
       }
     });
     isinitialized = true;
@@ -61,5 +103,30 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
   @override
   void removeCursorMoved(CursorMovedCallback callback) {
     cursorMovedCallbacks.remove(callback);
+  }
+
+  final List<CursorPressedCallback> cursorPressedCallbacks = [];
+
+  @override
+  void addCursorPressed(CursorPressedCallback callback) {
+    if (!isinitialized) init();
+    cursorPressedCallbacks.add(callback);
+  }
+
+  @override
+  void removeCursorPressed(CursorPressedCallback callback) {
+    cursorPressedCallbacks.remove(callback);
+  }
+
+  final List<CursorWheelCallback> cursorWheelCallbacks = [];
+  @override
+  void addCursorWheel(CursorWheelCallback callback) {
+    if (!isinitialized) init();
+    cursorWheelCallbacks.add(callback);
+  }
+
+  @override
+  void removeCursorWheel(CursorWheelCallback callback) {
+    cursorWheelCallbacks.remove(callback);
   }
 }
