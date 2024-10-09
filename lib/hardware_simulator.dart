@@ -24,8 +24,8 @@ class HWMouse {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);
   }
 
-  void performMouseScroll(int direction, int delta) {
-    HardwareSimulatorPlatform.instance.performMouseScroll(direction, delta);
+  void performMouseScroll(double dx, double dy) {
+    HardwareSimulatorPlatform.instance.performMouseScroll(dx, dy);
   }
 }
 

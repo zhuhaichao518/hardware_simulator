@@ -135,12 +135,11 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     });
   }
 
-  // Direction 0:vertial 1:horizontal
   @override
-  Future<void> performMouseScroll(int direction, int delta) async {
+  Future<void> performMouseScroll(double dx, double dy) async {
     await methodChannel.invokeMethod('mouseScroll', {
-      'mousescroll': direction,
-      'delta': delta,
+      'dx': dx,
+      'dy': dy,
     });
   }
 }

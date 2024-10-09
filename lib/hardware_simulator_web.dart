@@ -48,7 +48,10 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
   
   Map<int, int> webToWindowsMouseButtonMap = {
     0: 1, //leftbutton
+    1: 2, //middlebutton
     2: 3, //rightbutton
+    3: 4, //x1
+    4: 5, //x2
   };
 
   void init() {
