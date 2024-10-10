@@ -76,11 +76,13 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
 
   void addCursorImageUpdated(
       CursorImageUpdatedCallback callback, int callbackId) {
-    throw UnimplementedError('addCursorImageUpdated() has not been implemented.');
+    throw UnimplementedError(
+        'addCursorImageUpdated() has not been implemented.');
   }
 
   void removeCursorImageUpdated(int callbackId) {
-    throw UnimplementedError('removeCursorImageUpdated() has not been implemented.');
+    throw UnimplementedError(
+        'removeCursorImageUpdated() has not been implemented.');
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {
@@ -90,13 +92,15 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   // Relative mouse movement.
   Future<void> performMouseMoveRelative(
       double deltax, double deltay, int screenId) async {
-    throw UnimplementedError('performMouseMoveRelative() has not been implemented.');
+    throw UnimplementedError(
+        'performMouseMoveRelative() has not been implemented.');
   }
 
   // Absolute mouse movement. x, y is the percentage of the screen ranged from 0 - 1.
   Future<void> performMouseMoveAbsl(
       double percentx, double percenty, int screenId) async {
-    throw UnimplementedError('performMouseMoveAbsl() has not been implemented.');
+    throw UnimplementedError(
+        'performMouseMoveAbsl() has not been implemented.');
   }
 
   Future<void> performMouseClick(int buttonId, bool isDown) async {

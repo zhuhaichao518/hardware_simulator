@@ -48,6 +48,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }
     return true;
   }
+
   void _moveMouseAbsolute() {
     double x = double.tryParse(xController.text) ?? 0;
     double y = double.tryParse(yController.text) ?? 0;

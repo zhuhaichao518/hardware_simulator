@@ -45,7 +45,7 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
   }
 
   bool isinitialized = false;
-  
+
   Map<int, int> webToWindowsMouseButtonMap = {
     0: 1, //leftbutton
     1: 2, //middlebutton
@@ -60,39 +60,39 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
       // 使用 movementX 和 movementY 获取相对位移
       double dx = event.movement.x.toDouble();
       double dy = event.movement.y.toDouble();
-      for (var callback in cursorMovedCallbacks){
-        callback(dx,dy);
+      for (var callback in cursorMovedCallbacks) {
+        callback(dx, dy);
       }
     });
 
     document.onMouseWheel.listen((event) {
       double dx = event.deltaX.toDouble();
       double dy = event.deltaY.toDouble();
-      for (var callback in cursorWheelCallbacks){
-        callback(dx,dy);
+      for (var callback in cursorWheelCallbacks) {
+        callback(dx, dy);
       }
     });
-    
+
     document.onMouseDown.listen((event) {
       int buttonId = event.button;
-      if (webToWindowsMouseButtonMap.containsKey(buttonId)){
-          buttonId = webToWindowsMouseButtonMap[buttonId]!;
+      if (webToWindowsMouseButtonMap.containsKey(buttonId)) {
+        buttonId = webToWindowsMouseButtonMap[buttonId]!;
       }
-      for (var callback in cursorPressedCallbacks){
-        callback(buttonId,true);
+      for (var callback in cursorPressedCallbacks) {
+        callback(buttonId, true);
       }
     });
 
     document.onMouseUp.listen((event) {
       int buttonId = event.button;
-      if (webToWindowsMouseButtonMap.containsKey(buttonId)){
-          buttonId = webToWindowsMouseButtonMap[buttonId]!;
-          for (var callback in cursorPressedCallbacks){
-            callback(buttonId,false);
-          }
+      if (webToWindowsMouseButtonMap.containsKey(buttonId)) {
+        buttonId = webToWindowsMouseButtonMap[buttonId]!;
+        for (var callback in cursorPressedCallbacks) {
+          callback(buttonId, false);
+        }
       }
     });
-    
+
     //This is a workaround for https://github.com/flutter/engine/pull/19632.
     //You also need to care about engine/src/flutter/lib/web_ui/lib/src/engine/keyboard_binding.dart
     //to cancel the guard. CloudPlayPlus does not need this, you can do it as you like.
