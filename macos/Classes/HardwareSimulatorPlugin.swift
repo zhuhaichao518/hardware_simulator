@@ -1,6 +1,6 @@
 import Cocoa
 import FlutterMacOS 
-import CryptoKit
+import CommonCrypto
 
 class CursorConstants {    
   static let cursorUpdatedDefault = 3    
@@ -8,7 +8,6 @@ class CursorConstants {
   static let cursorUpdatedCached = 5
 }
 
-@available(macOS 10.15, *)
 public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
   private var methodChannel: FlutterMethodChannel?
   private var defaultCursorHasher: CursorHasher?
@@ -509,7 +508,6 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
   }
 }
 
-@available(macOS 10.15, *)
 class CursorHasher {
     private var cursorHashMap: [String: Int] = [:]
     
@@ -553,7 +551,6 @@ class CursorHasher {
     }
 }
 
-@available(macOS 10.15, *)
 func sha256ForAllBitmapReps(in image: NSImage) -> String {
     var alldata = Data()
     for rep in image.representations {
@@ -564,7 +561,13 @@ func sha256ForAllBitmapReps(in image: NSImage) -> String {
             alldata.append(data)
         }
     }
-    let hash = SHA256.hash(data: alldata)
-    let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
+    
+    var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+    alldata.withUnsafeBytes {
+        _ = CC_SHA256($0.baseAddress, CC_LONG(alldata.count), &hash)
+    }
+    
+    let hashString = hash.map { String(format: "%02x", $0) }.joined()
     return hashString
 }
+
