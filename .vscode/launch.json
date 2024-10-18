@@ -10,6 +10,13 @@
             "name": "Launch Chrome against localhost",
             "url": "http://localhost:8080",
             "webRoot": "${workspaceFolder}"
-        }
+        },
+        {
+            "name": "attach",
+            "request": "attach", // Attach instead of launching
+            "type": "dart",
+            "cwd": "example",
+            "vmServiceUri": "${command:dart.promptForVmService}" // Prompt for the VM Service URI
+        },
     ]
 }

@@ -1,13 +1,23 @@
 import Cocoa
-import FlutterMacOS
+import FlutterMacOS 
+import CryptoKit
 
+class CursorConstants {    
+  static let cursorUpdatedDefault = 3    
+  static let cursorUpdatedImage = 4    
+  static let cursorUpdatedCached = 5
+}
+
+@available(macOS 10.15, *)
 public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
   private var methodChannel: FlutterMethodChannel?
+  private var defaultCursorHasher: CursorHasher?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "hardware_simulator", binaryMessenger: registrar.messenger)
     let instance = HardwareSimulatorPlugin()
     instance.methodChannel = channel
+    instance.defaultCursorHasher = CursorHasher()
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
@@ -232,6 +242,118 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           "dy": deltaY,
       ])
   }
+
+  var mouseMovedMonitor: Any?
+  var previousCursorImage: NSImage?
+  var previousCursorImageHashes: String = ""
+  var cursorChangedCallbacks = Set<Int>()
+  var jsHashWithImageHash = Dictionary<String, UInt32>()
+
+  func JSHash(buffer: [UInt8], size: Int) -> UInt32 {
+    var hash: UInt32 = 1315423911
+    for i in 0..<size {
+        hash ^= ((hash << 5) &+ UInt32(buffer[i]) &+ (hash >> 2))
+    }
+    return hash & 0x7FFFFFFF
+  }
+
+  func getBitMapInt8(bitmapRep: NSBitmapImageRep) -> [UInt8]?{
+    let width = bitmapRep.pixelsWide
+    let height = bitmapRep.pixelsHigh
+    let samplesPerPixel = bitmapRep.samplesPerPixel
+
+    guard let bitmapData = bitmapRep.bitmapData else {
+        print("No bitmap Data")
+        return nil
+    }
+
+    var pixels: [UInt8] = Array(repeating: 0, count: width * height*4)
+    for pixelIndex in 0..<width*height{
+          pixels[pixelIndex*4+1]  = bitmapData[pixelIndex*samplesPerPixel + 2]
+          pixels[pixelIndex*4+2] = bitmapData[pixelIndex*samplesPerPixel + 1]
+          pixels[pixelIndex*4+3] =  bitmapData[pixelIndex*samplesPerPixel ]
+          pixels[pixelIndex*4+0] = samplesPerPixel == 4 ? bitmapData[pixelIndex*4 + 3] : 255
+    }
+
+    return pixels
+  }
+
+  private func checkMouseCursor() {
+   
+    let currentCursor = NSCursor.currentSystem 
+    if(currentCursor == nil){
+        return;
+    }
+    
+    let cursorImage = currentCursor?.image
+    let hotSpot = currentCursor?.hotSpot
+
+    let cursorImageHashes = sha256ForAllBitmapReps(in: cursorImage!)
+
+    if(cursorImageHashes == previousCursorImageHashes){
+        return;
+    }
+    previousCursorImageHashes = cursorImageHashes
+    previousCursorImage = cursorImage
+
+    //system default
+    if defaultCursorHasher?.getHashMap().keys.contains(cursorImageHashes) ?? false {
+      let cursorIndex = defaultCursorHasher?.getHashMap()[cursorImageHashes]
+        //print("default: \(cursorIndex!)");
+        for callbackID in cursorChangedCallbacks {
+          let message: [String: Any] = [
+              "callbackID": callbackID,
+              "message": CursorConstants.cursorUpdatedDefault,
+              "msg_info": cursorIndex,
+              "cursorImage": FlutterStandardTypedData.init(bytes: Data([]))
+          ]
+          methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+        }
+        return ;
+    }
+      
+    //cache iamge
+    if jsHashWithImageHash.keys.contains(cursorImageHashes) {
+      //print("cache: \(jsHashWithImageHash[cursorImageHashes])");
+      let messageHash = jsHashWithImageHash[cursorImageHashes]
+      for callbackID in cursorChangedCallbacks {
+        let message: [String: Any] = [
+            "callbackID": callbackID,
+            "message": CursorConstants.cursorUpdatedCached,
+            "msg_info": messageHash,
+            "cursorImage": FlutterStandardTypedData.init(bytes: Data([]))
+        ]
+        methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+      }
+      return ;
+    }
+      
+    let imagedataInt8 = getBitMapInt8(bitmapRep: cursorImage!.representations[0] as! NSBitmapImageRep)
+    let messageHash = JSHash(buffer: imagedataInt8!, size: imagedataInt8!.count)
+    jsHashWithImageHash[cursorImageHashes] = messageHash
+
+    //print("[messageHash:\(messageHash)] \n cursorImagepixelsWide:\(cursorImage!.representations[0].pixelsWide) \n  cursorImagepixelsWide: \(cursorImage!.representations[0].pixelsHigh)\n")
+    var int8Image:[UInt8] = [9];
+    int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsWide)])
+    int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsHigh)])
+    int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.x)])
+    int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.y)])
+    int8Image.append(UInt8((messageHash >> 24) & 0xFF))
+    int8Image.append(UInt8((messageHash >> 16) & 0xFF)) 
+    int8Image.append(UInt8((messageHash >> 8) & 0xFF))
+    int8Image.append(UInt8(messageHash & 0xFF))
+    int8Image.append(contentsOf: imagedataInt8!)
+
+    for callbackID in cursorChangedCallbacks {
+      let message: [String: Any] = [
+          "callbackID": callbackID,
+          "message": CursorConstants.cursorUpdatedImage,
+          "msg_info": messageHash,
+          "cursorImage": FlutterStandardTypedData.init(bytes: Data(int8Image))
+      ]
+      methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+    }
+  }
   
   var activities: [String: NSObjectProtocol] = [:]
 
@@ -312,6 +434,31 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       NSCursor.unhide()
       stopTrackingMouse()
       result(nil)
+    case "hookCursorImage":
+      if let args = call.arguments as? [String: Any],
+          let callbackID = args["callbackID"] as? Int{
+          if cursorChangedCallbacks.count == 0{
+            mouseMovedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in  self?.checkMouseCursor() }
+          }
+          cursorChangedCallbacks.insert(callbackID)
+         }
+      else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for hookCursorImage", details: nil))
+      }
+    case "unhookCursorImage":
+      if let args = call.arguments as? [String: Any],
+        let callbackID = args["callbackID"] as? Int{
+          cursorChangedCallbacks.remove(callbackID)
+          if cursorChangedCallbacks.count == 0{
+              if let monitor = mouseMovedMonitor {
+               NSEvent.removeMonitor(monitor)
+            }
+          }
+         }
+      else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for unhookCursorImage", details: nil))
+      }
+
     default:
       print("Hardware Simulator: Method called but not implemented: \(call.method)")
       if let arguments = call.arguments {
@@ -322,4 +469,64 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       result(nil);
     }
   }
+}
+
+@available(macOS 10.15, *)
+class CursorHasher {
+    private var cursorHashMap: [String: Int] = [:]
+    
+    init() {
+        calculateHashesForDefaultCursors()
+    }
+    
+    private func calculateHashesForDefaultCursors() {
+        let defaultCursors: [NSCursor : Int] = [
+         .arrow : 32512,                // IDC_ARROW
+         .iBeam : 32513,                // IDC_IBEAM
+         .crosshair : 32515,             // IDC_CROSS
+         .pointingHand:32649,           // IDC_HAND
+         .resizeLeftRight:32644,        // IDC_SIZEWE
+         .resizeUpDown:32645,           // IDC_SIZENS
+         .operationNotAllowed:32648,    // IDC_NO
+         .closedHand: 32401,          // custom grabbing
+         .openHand: 32402,            // custom grab
+         .resizeUp:32403,             // custom resizeUp
+         .resizeDown:32404,           // custom resizeDown
+         .resizeLeft:32405,           // custom resizeLeft
+         .resizeRight:32406,          // custom resizeRight
+         .disappearingItem:32407,     // custom disappearing
+         .contextualMenu:32408,       // custom contextMenu
+         .dragLink:  32409,           // custom alias
+         .dragCopy:  32410,          // custom copy
+         .iBeamCursorForVerticalLayout : 32411 // custom verticalText
+      ]
+
+      for (cursor,index) in defaultCursors {
+          if(cursor == nil || cursor.image == nil){
+            continue
+          }
+          let hash = sha256ForAllBitmapReps(in: cursor.image)
+          cursorHashMap[hash] = index
+      }
+    }
+    
+    func getHashMap() -> [String: Int] {
+        return cursorHashMap
+    }
+}
+
+@available(macOS 10.15, *)
+func sha256ForAllBitmapReps(in image: NSImage) -> String {
+    var alldata = Data()
+    for rep in image.representations {
+        if let bitmapRep = rep as? NSBitmapImageRep {
+            guard let pixelData = bitmapRep.bitmapData else { continue }
+            let dataSize = bitmapRep.bytesPerRow * bitmapRep.pixelsHigh
+            let data = Data(bytes: pixelData, count: dataSize)
+            alldata.append(data)
+        }
+    }
+    let hash = SHA256.hash(data: alldata)
+    let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
+    return hashString
 }
