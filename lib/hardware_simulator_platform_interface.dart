@@ -5,7 +5,10 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'hardware_simulator_method_channel.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
-typedef CursorImageUpdatedCallback = void Function(int message, int messageInfo, Uint8List cursorImage);
+typedef CursorPressedCallback = void Function(int button, bool isDown);
+typedef CursorWheelCallback = void Function(double deltaX, double deltaY);
+typedef CursorImageUpdatedCallback = void Function(
+    int message, int messageInfo, Uint8List cursorImage);
 
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
@@ -52,39 +55,59 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   void removeCursorMoved(CursorMovedCallback callback) {
-    print("removeCursorMoved called but not supported.");
+    throw UnimplementedError('removeCursorMoved() has not been implemented.');
   }
 
-  void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+  void addCursorPressed(CursorPressedCallback callback) {
+    throw UnimplementedError('addCursorPressed() has not been implemented.');
+  }
+
+  void removeCursorPressed(CursorPressedCallback callback) {
+    throw UnimplementedError('removeCursorPressed() has not been implemented.');
+  }
+
+  void addCursorWheel(CursorWheelCallback callback) {
+    throw UnimplementedError('addCursorWheel() has not been implemented.');
+  }
+
+  void removeCursorWheel(CursorWheelCallback callback) {
+    throw UnimplementedError('removeCursorWheel() has not been implemented.');
+  }
+
+  void addCursorImageUpdated(
+      CursorImageUpdatedCallback callback, int callbackId) {
+    throw UnimplementedError(
+        'addCursorImageUpdated() has not been implemented.');
   }
 
   void removeCursorImageUpdated(int callbackId) {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError(
+        'removeCursorImageUpdated() has not been implemented.');
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performKeyEvent() has not been implemented.');
   }
 
   // Relative mouse movement.
   Future<void> performMouseMoveRelative(
       double deltax, double deltay, int screenId) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError(
+        'performMouseMoveRelative() has not been implemented.');
   }
 
   // Absolute mouse movement. x, y is the percentage of the screen ranged from 0 - 1.
   Future<void> performMouseMoveAbsl(
       double percentx, double percenty, int screenId) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError(
+        'performMouseMoveAbsl() has not been implemented.');
   }
 
   Future<void> performMouseClick(int buttonId, bool isDown) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('performMouseClick() has not been implemented.');
   }
 
-  // Direction 0:vertial 1:horizontal
-  Future<void> performMouseScroll(int direction, int delta) async {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+  Future<void> performMouseScroll(double dx, double dy) async {
+    throw UnimplementedError('performMouseScroll() has not been implemented.');
   }
 }

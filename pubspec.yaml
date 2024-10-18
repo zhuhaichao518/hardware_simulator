@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
+  web: ^1.0.0
+  flutter_web_plugins:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +48,10 @@ flutter:
         pluginClass: HardwareSimulatorPlugin
       windows:
         pluginClass: HardwareSimulatorPluginCApi
+      web:
+        pluginClass: HardwareSimulatorPluginWeb
+        fileName: hardware_simulator_web.dart
+        
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

@@ -1,8 +1,6 @@
-import 'dart:typed_data';
-import 'dart:ui' as ui show Image,
-        decodeImageFromPixels,
-        PixelFormat;
+import 'dart:ui' as ui show Image, decodeImageFromPixels, PixelFormat;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
@@ -39,6 +37,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   final HardwareSimulator hardwareSimulator = HardwareSimulator();
 
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      print('Key Down: ${event.logicalKey}');
+    } else if (event is KeyUpEvent) {
+      print('Key Up: ${event.logicalKey}');
+    } else {
+      print('repeat ${event.logicalKey}');
+    }
+    return true;
+  }
+
   void _moveMouseAbsolute() {
     double x = double.tryParse(xController.text) ?? 0;
     double y = double.tryParse(yController.text) ?? 0;
@@ -64,11 +73,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           .performKeyEvent(keyCode, false); // Release
     });
   }
-  
+
   ui.Image? image;
 
-  Map<int,ui.Image> cached_images = {};
-  
+  Map<int, ui.Image> cached_images = {};
+
   Future<ui.Image> rawBGRAtoImage(
       Uint8List bytes, int width, int height) async {
     final Completer<ui.Image> completer = Completer();
@@ -93,9 +102,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     });
   }
 
-  void _registerCursorChanged() async{
-    HardwareSimulator.addCursorImageUpdated((int message, int messageInfo, Uint8List cursorImage){
-      if (message == HardwareSimulator.CURSOR_UPDATED_IMAGE){
+  void _registerCursorChanged() async {
+    HardwareSimulator.addCursorImageUpdated(
+        (int message, int messageInfo, Uint8List cursorImage) {
+      if (message == HardwareSimulator.CURSOR_UPDATED_IMAGE) {
         //cursor hash: 0 + size + hash + data
         int width = 0;
         int height = 0;
@@ -122,15 +132,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           }
           updateCursorImage(cursorImage.sublist(21), width, height, hash);
         }
-      }else if (message == HardwareSimulator.CURSOR_UPDATED_CACHED){
+      } else if (message == HardwareSimulator.CURSOR_UPDATED_CACHED) {
         setState(() {
           image = cached_images[messageInfo]; // 在setState中更新image
         });
       }
-    },1);
+    }, 1);
   }
 
-  void _unregisterCursorChanged() async{
+  void _unregisterCursorChanged() async {
     HardwareSimulator.removeCursorImageUpdated(1);
   }
 
@@ -139,11 +149,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   @override
   void initState() {
     super.initState();
+    // 监听硬件键盘事件
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _textFieldFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _textFieldFocusNode?.dispose();
     _unregisterCursorChanged();
     super.dispose();
@@ -154,7 +167,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _openWebPage() async {
-    await launchUrl(Uri.parse('https://timmaffett.github.io/custom_mouse_cursor/#/'));
+    await launchUrl(
+        Uri.parse('https://timmaffett.github.io/custom_mouse_cursor/#/'));
   }
 
   @override
@@ -226,13 +240,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           children: [
             Expanded(
                 child: image == null
-              ? CircularProgressIndicator()
-              : CustomPaint(
-                  painter: ImagePainter(image!),
-                  size: Size(image!.width.toDouble(), image!.height.toDouble()),
-                )),
+                    ? CircularProgressIndicator()
+                    : CustomPaint(
+                        painter: ImagePainter(image!),
+                        size: Size(
+                            image!.width.toDouble(), image!.height.toDouble()),
+                      )),
             ElevatedButton(
-              //https://timmaffett.github.io/custom_mouse_cursor/#/
+                //https://timmaffett.github.io/custom_mouse_cursor/#/
                 onPressed: _openWebPage,
                 child: Text('open test cursor web')),
             ElevatedButton(

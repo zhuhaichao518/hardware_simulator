@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'hardware_simulator_platform_interface.dart';
 
 class HWKeyboard {
@@ -20,14 +18,14 @@ class HWMouse {
     HardwareSimulatorPlatform.instance
         .performMouseMoveAbsl(percentx, percenty, screenId);
   }
-  
+
   // mouse left button id 1, right button id 3
   void performMouseClick(int buttonId, bool isDown) {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);
   }
 
-  void performMouseScroll(int direction, int delta) {
-    HardwareSimulatorPlatform.instance.performMouseScroll(direction, delta);
+  void performMouseScroll(double dx, double dy) {
+    HardwareSimulatorPlatform.instance.performMouseScroll(dx, dy);
   }
 }
 
@@ -36,6 +34,8 @@ class HardwareSimulator {
   //it should be plugged in and then used.
   static HWKeyboard keyboard = HWKeyboard();
   static HWMouse mouse = HWMouse();
+
+  static bool cursorlocked = false;
 
   Future<String?> getPlatformVersion() {
     return HardwareSimulatorPlatform.instance.getPlatformVersion();
@@ -46,10 +46,13 @@ class HardwareSimulator {
   }
 
   static Future<void> lockCursor() async {
+    cursorlocked = true;
     return HardwareSimulatorPlatform.instance.lockCursor();
   }
 
   static Future<void> unlockCursor() async {
+    if (!cursorlocked) return;
+    cursorlocked = false;
     return HardwareSimulatorPlatform.instance.unlockCursor();
   }
 
@@ -59,6 +62,22 @@ class HardwareSimulator {
 
   static void removeCursorMoved(CursorMovedCallback callback) {
     HardwareSimulatorPlatform.instance.removeCursorMoved(callback);
+  }
+
+  static void addCursorPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.addCursorPressed(callback);
+  }
+
+  static void removeCursorPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.removeCursorPressed(callback);
+  }
+
+  static void addCursorWheel(CursorWheelCallback callback) {
+    HardwareSimulatorPlatform.instance.addCursorWheel(callback);
+  }
+
+  static void removeCursorWheel(CursorWheelCallback callback) {
+    HardwareSimulatorPlatform.instance.removeCursorWheel(callback);
   }
 
   // ignore: constant_identifier_names
@@ -72,8 +91,10 @@ class HardwareSimulator {
   // ignore: constant_identifier_names
   static const int CURSOR_UPDATED_CACHED = 5;
 
-  static void addCursorImageUpdated(CursorImageUpdatedCallback callback, int callbackId) {
-    HardwareSimulatorPlatform.instance.addCursorImageUpdated(callback, callbackId);
+  static void addCursorImageUpdated(
+      CursorImageUpdatedCallback callback, int callbackId) {
+    HardwareSimulatorPlatform.instance
+        .addCursorImageUpdated(callback, callbackId);
   }
 
   static void removeCursorImageUpdated(int callbackId) {
