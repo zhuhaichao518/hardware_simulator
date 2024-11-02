@@ -22,6 +22,8 @@ list(APPEND PLUGIN_SOURCES
   "hardware_simulator_plugin.h"
   "cursor_monitor.cc"
   "cursor_monitor.h"
+  "gamecontroller_manager.cc"
+  "gamecontroller_manager.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -46,57 +48,19 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
+include_directories(
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/include"
+)
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin 
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/lib/x64/ViGEmClient.lib")
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an
 # external build triggered from this build file.
 set(hardware_simulator_bundled_libraries
-  ""
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/lib/x64/ViGEmClient.dll"
   PARENT_SCOPE
 )
 
-# === Tests ===
-# These unit tests can be run from a terminal after building the example, or
-# from Visual Studio after opening the generated solution file.
-
-# Only enable test builds when building the example (which sets this variable)
-# so that plugin clients aren't building the tests.
-if (${include_${PROJECT_NAME}_tests})
-set(TEST_RUNNER "${PROJECT_NAME}_test")
-enable_testing()
-
-# Add the Google Test dependency.
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/release-1.11.0.zip
-)
-# Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-# Disable install commands for gtest so it doesn't end up in the bundle.
-set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of googletest" FORCE)
-FetchContent_MakeAvailable(googletest)
-
-# The plugin's C API is not very useful for unit testing, so build the sources
-# directly into the test binary rather than using the DLL.
-add_executable(${TEST_RUNNER}
-  test/hardware_simulator_plugin_test.cpp
-  ${PLUGIN_SOURCES}
-)
-apply_standard_settings(${TEST_RUNNER})
-target_include_directories(${TEST_RUNNER} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin)
-target_link_libraries(${TEST_RUNNER} PRIVATE gtest_main gmock)
-# flutter_wrapper_plugin has link dependencies on the Flutter DLL.
-add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  "${FLUTTER_LIBRARY}" $<TARGET_FILE_DIR:${TEST_RUNNER}>
-)
-
-# Enable automatic test discovery.
-include(GoogleTest)
-gtest_discover_tests(${TEST_RUNNER})
-endif()

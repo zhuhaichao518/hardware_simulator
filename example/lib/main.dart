@@ -170,6 +170,27 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     await launchUrl(
         Uri.parse('https://timmaffett.github.io/custom_mouse_cursor/#/'));
   }
+  
+  GameController? controller;
+
+  void _insertGameController() async {
+    controller = await HardwareSimulator.createGameController();
+  }
+
+  void _removeGameController() async {
+    await controller?.dispose();
+    controller = null;
+  }
+
+  void _pressAbutton() async {
+    //"xinput: $word $bLeftTrigger $bRightTrigger $sThumbLX $sThumbLY $sThumbRX $sThumbRY "
+    controller?.simulate("1 0 0 0 0 0 0");
+  }
+
+  void _releaseAbutton() async {
+    //"xinput: $word $bLeftTrigger $bRightTrigger $sThumbLX $sThumbLY $sThumbRX $sThumbRY "
+    controller?.simulate("0 0 0 0 0 0 0");
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -256,6 +277,24 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
                 onPressed: _unregisterCursorChanged,
                 child: Text('unregister CursorImageChanged')),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+                //https://timmaffett.github.io/custom_mouse_cursor/#/
+                onPressed: _insertGameController,
+                child: Text('plug in game controller')),
+            ElevatedButton(
+                onPressed: _removeGameController,
+                child: Text('plug out game controller')),
+            ElevatedButton(
+                onPressed: _pressAbutton,
+                child: Text('press up button')),
+            ElevatedButton(
+                onPressed: _releaseAbutton,
+                child: Text('release up button')),
           ],
         ),
       ],

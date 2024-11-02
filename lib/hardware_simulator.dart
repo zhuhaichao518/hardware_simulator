@@ -29,6 +29,28 @@ class HWMouse {
   }
 }
 
+class GameController {
+  int controllerId;
+
+  GameController(this.controllerId);
+
+  static Future<GameController?> createGameController() async {
+    int id = await HardwareSimulatorPlatform.instance.createGameController();
+    // creation failed.
+    if (id < 0) return null;
+    return GameController(id);
+  }
+
+  Future<void> dispose() async{
+    if (controllerId < 0) return;
+    await HardwareSimulatorPlatform.instance.removeGameController(controllerId);
+  }
+  
+  Future<void> simulate(String action) async{
+    HardwareSimulatorPlatform.instance.doControllerAction(controllerId, action);
+  }
+}
+
 class HardwareSimulator {
   //For keyboard and mouse, it is a singleton. For other hardwares like game controllers,
   //it should be plugged in and then used.
@@ -107,5 +129,9 @@ class HardwareSimulator {
 
   HWMouse getMouse() {
     return mouse;
+  }
+
+  static Future<GameController?> createGameController(){
+    return GameController.createGameController();
   }
 }

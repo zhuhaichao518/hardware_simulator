@@ -110,4 +110,16 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   Future<void> performMouseScroll(double dx, double dy) async {
     throw UnimplementedError('performMouseScroll() has not been implemented.');
   }
+
+  Future<int> createGameController() async {
+    throw UnimplementedError('createGameController() has not been implemented.');
+  }
+
+  Future<void> removeGameController(int controllerId) async {
+    throw UnimplementedError('removeGameController() has not been implemented.');
+  }
+
+  Future<void> doControllerAction(int controllerId, String action) async {
+    throw UnimplementedError('removeGameController() has not been implemented.');
+  }
 }

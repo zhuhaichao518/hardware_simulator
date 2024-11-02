@@ -1,6 +1,7 @@
 #include "hardware_simulator_plugin.h"
 
 #include "cursor_monitor.h"
+#include "gamecontroller_manager.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -280,6 +281,33 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
         CursorMonitor::endHook(callbackID);
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("createGameController") == 0) {
+        int hr = GameControllerManager::CreateGameController();
+        result->Success(flutter::EncodableValue(hr));
+  } else if (method_call.method_name().compare("removeGameController") == 0) {
+        auto id = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("id")))->second));
+        int hr = GameControllerManager::RemoveGameController(id);
+        result->Success(flutter::EncodableValue(hr));
+  } else if (method_call.method_name().compare("doControlAction") == 0) {
+    if (args) {
+        auto id_iter = args->find(flutter::EncodableValue("id"));
+        auto action_iter = args->find(flutter::EncodableValue("action"));
+        
+        if (id_iter != args->end() && action_iter != args->end() &&
+            std::holds_alternative<int>(id_iter->second) &&
+            std::holds_alternative<std::string>(action_iter->second)) {
+            
+            int id = std::get<int>(id_iter->second);
+            std::string action = std::get<std::string>(action_iter->second);
+
+            GameControllerManager::DoControllerAction(id, action);
+            result->Success(flutter::EncodableValue());
+        } else {
+            result->Error("InvalidArguments", "Missing or invalid arguments for doControlAction");
+        }
+    } else {
+        result->Error("NullArguments", "Arguments are null for doControlAction");
+    }
   }
   else {
     result->NotImplemented();

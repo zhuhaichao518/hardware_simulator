@@ -139,4 +139,32 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'dy': dy,
     });
   }
+
+  @override
+  Future<int> createGameController() async {
+    if (!Platform.isWindows) return -1;
+    final gamepadId =
+        await methodChannel.invokeMethod<int>('createGameController');
+    return gamepadId!;
+  }
+
+  @override
+  Future<void> removeGameController(int controllerId) async{
+    await methodChannel.invokeMethod('removeGameController', {
+      'id': controllerId,
+    });
+  }
+  
+  @override
+  Future<void> doControllerAction(int controllerId, String action) async {
+    /*await methodChannel.invokeMethod('doControlAction', {
+      'id': controllerId,
+      'action': action,
+    });
+*/
+    await methodChannel.invokeMethod(
+      'doControlAction',
+      <String, dynamic>{'id': controllerId, 'action': action},
+    );
+  }
 }
