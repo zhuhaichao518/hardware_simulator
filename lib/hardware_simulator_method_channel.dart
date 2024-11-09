@@ -149,12 +149,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<void> removeGameController(int controllerId) async{
+  Future<void> removeGameController(int controllerId) async {
     await methodChannel.invokeMethod('removeGameController', {
       'id': controllerId,
     });
   }
-  
+
   @override
   Future<void> doControllerAction(int controllerId, String action) async {
     /*await methodChannel.invokeMethod('doControlAction', {

@@ -170,7 +170,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     await launchUrl(
         Uri.parse('https://timmaffett.github.io/custom_mouse_cursor/#/'));
   }
-  
+
   GameController? controller;
 
   void _insertGameController() async {
@@ -290,11 +290,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 onPressed: _removeGameController,
                 child: Text('plug out game controller')),
             ElevatedButton(
-                onPressed: _pressAbutton,
-                child: Text('press up button')),
+                onPressed: _pressAbutton, child: Text('press up button')),
             ElevatedButton(
-                onPressed: _releaseAbutton,
-                child: Text('release up button')),
+                onPressed: _releaseAbutton, child: Text('release up button')),
           ],
         ),
       ],

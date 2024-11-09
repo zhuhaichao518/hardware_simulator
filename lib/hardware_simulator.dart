@@ -41,12 +41,12 @@ class GameController {
     return GameController(id);
   }
 
-  Future<void> dispose() async{
+  Future<void> dispose() async {
     if (controllerId < 0) return;
     await HardwareSimulatorPlatform.instance.removeGameController(controllerId);
   }
-  
-  Future<void> simulate(String action) async{
+
+  Future<void> simulate(String action) async {
     HardwareSimulatorPlatform.instance.doControllerAction(controllerId, action);
   }
 }
@@ -131,7 +131,7 @@ class HardwareSimulator {
     return mouse;
   }
 
-  static Future<GameController?> createGameController(){
+  static Future<GameController?> createGameController() {
     return GameController.createGameController();
   }
 }
