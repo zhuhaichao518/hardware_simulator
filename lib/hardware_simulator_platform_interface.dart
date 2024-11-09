@@ -112,14 +112,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   Future<int> createGameController() async {
-    throw UnimplementedError('createGameController() has not been implemented.');
+    throw UnimplementedError(
+        'createGameController() has not been implemented.');
   }
 
   Future<void> removeGameController(int controllerId) async {
-    throw UnimplementedError('removeGameController() has not been implemented.');
+    throw UnimplementedError(
+        'removeGameController() has not been implemented.');
   }
 
   Future<void> doControllerAction(int controllerId, String action) async {
-    throw UnimplementedError('removeGameController() has not been implemented.');
+    throw UnimplementedError(
+        'removeGameController() has not been implemented.');
   }
 }
