@@ -263,6 +263,18 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
         performMouseButton(static_cast<int>(std::get<int>((buttonid))), !static_cast<bool>(std::get<bool>((isDown))));
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("mouseScroll") == 0) {
+        auto dx = (args->find(flutter::EncodableValue("dx")))->second;
+        auto dy = (args->find(flutter::EncodableValue("dy")))->second;
+        int deltax = static_cast<double>(std::get<double>((dx)));
+        int deltay = static_cast<double>(std::get<double>((dy)));
+        if (deltax!=0){
+          hscroll(deltax * 2);
+        }
+        if (deltay!=0){
+          scroll(deltay * 2);
+        }
+        result->Success(nullptr);
   } else if (method_call.method_name().compare("hookCursorImage") == 0) {
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
         CursorMonitor::startHook([this, callbackID](int message, int msg_info, const std::vector<uint8_t>& cursorImage) {
