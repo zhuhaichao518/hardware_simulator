@@ -1,6 +1,6 @@
 # hardware_simulator
 
-A new Flutter plugin project.
+This plugin simulates mouse & keyboard input. Currently it is not well documented. Any pull request is welcome. It is designed for https://github.com/zhuhaichao518/cloudplayplus_stone.
 
 ## Getting Started
 
