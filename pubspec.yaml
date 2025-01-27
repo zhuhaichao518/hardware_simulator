@@ -40,8 +40,8 @@ flutter:
       android:
         package: com.cloudplayplus.hardware_simulator
         pluginClass: HardwareSimulatorPlugin
-      ios:
-        pluginClass: HardwareSimulatorPlugin
+      #ios:
+      #  pluginClass: HardwareSimulatorPlugin
       linux:
         pluginClass: HardwareSimulatorPlugin
       macos:
