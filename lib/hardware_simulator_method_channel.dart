@@ -57,6 +57,32 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     return count;
   }
 
+  @override
+  Future<void> registerService() async {
+    if (!Platform.isWindows) {
+      return;
+    }
+    methodChannel.invokeMethod('registerService');
+  }
+
+  @override
+  Future<void> unregisterService() async {
+    if (!Platform.isWindows) {
+      return;
+    }
+    methodChannel.invokeMethod('unregisterService');
+  }
+  
+  @override
+  Future<bool> isRunningAsSystem() async{
+    if (!Platform.isWindows) {
+      return true;
+    }
+    final result =
+        await methodChannel.invokeMethod<bool>('isRunningAsSystem');
+    return result!;
+  }
+
   final List<CursorMovedCallback> cursorMovedCallbacks = [];
 
   @override

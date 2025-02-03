@@ -67,6 +67,18 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.getMonitorCount();
   }
 
+  static Future<void> registerService() {
+    return HardwareSimulatorPlatform.instance.registerService();
+  }
+
+  static Future<void> unregisterService() {
+    return HardwareSimulatorPlatform.instance.unregisterService();
+  }
+
+  static Future<bool?> isRunningAsSystem() {
+    return HardwareSimulatorPlatform.instance.isRunningAsSystem();
+  }
+
   static Future<void> lockCursor() async {
     cursorlocked = true;
     return HardwareSimulatorPlatform.instance.lockCursor();

@@ -40,6 +40,18 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     return 1;
   }
 
+  Future<void> registerService() async {
+    return;
+  }
+
+  Future<void> unregisterService() async {
+    return;
+  }
+
+  Future<bool> isRunningAsSystem() async{
+    return true;
+  }
+
   Future<void> lockCursor() async {
     // if not implemented, just care about main monitor.
     print("lockCursor called but not supported.");
