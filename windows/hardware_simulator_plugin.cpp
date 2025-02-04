@@ -17,6 +17,116 @@
 #include <memory>
 #include <sstream>
 
+// Used to run win32 service.
+#include <sddl.h>
+#include <shellapi.h>
+#include <shlwapi.h>  // PathCombineW, PathRemoveFileSpecW
+#include <string>
+
+#pragma comment(lib, "shlwapi.lib")
+
+
+BOOL IsRunningAsSystem() {
+    BOOL bIsSystem = FALSE;
+    HANDLE hToken = NULL;
+    DWORD dwLengthNeeded = 0;
+    PTOKEN_USER pTokenUser = NULL;
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+        return FALSE;
+    }
+
+    if (!GetTokenInformation(hToken, TokenUser, NULL, 0, &dwLengthNeeded) &&
+        (GetLastError() != ERROR_INSUFFICIENT_BUFFER)) {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    pTokenUser = (PTOKEN_USER)LocalAlloc(LPTR, dwLengthNeeded);
+    if (!pTokenUser) {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    if (!GetTokenInformation(hToken, TokenUser, pTokenUser, dwLengthNeeded, &dwLengthNeeded)) {
+        LocalFree(pTokenUser);
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    PSID pSystemSid = NULL;
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    if (!AllocateAndInitializeSid(&NtAuthority, 1, SECURITY_LOCAL_SYSTEM_RID,
+        0, 0, 0, 0, 0, 0, 0, &pSystemSid)) {
+        LocalFree(pTokenUser);
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    if (EqualSid(pTokenUser->User.Sid, pSystemSid)) {
+        bIsSystem = TRUE;
+    }
+
+    FreeSid(pSystemSid);
+    LocalFree(pTokenUser);
+    CloseHandle(hToken);
+
+    return bIsSystem;
+}
+
+bool RunBatchAsAdmin(
+    LPCWSTR lpBatchFileName, 
+    DWORD* pErrorCode = nullptr, 
+    bool bWait = false
+) {
+    WCHAR exePath[MAX_PATH] = {0};
+    if (0 == GetModuleFileNameW(nullptr, exePath, MAX_PATH)) {
+        if (pErrorCode) *pErrorCode = GetLastError();
+        return false;
+    }
+
+    WCHAR exeDir[MAX_PATH] = {0};
+    wcscpy_s(exeDir, exePath);
+    if (!PathRemoveFileSpecW(exeDir)) {
+        if (pErrorCode) *pErrorCode = ERROR_PATH_NOT_FOUND;
+        return false;
+    }
+
+    WCHAR batchPath[MAX_PATH] = {0};
+    if (!PathCombineW(batchPath, exeDir, lpBatchFileName)) {
+        if (pErrorCode) *pErrorCode = ERROR_INVALID_NAME;
+        return false;
+    }
+
+    if (INVALID_FILE_ATTRIBUTES == GetFileAttributesW(batchPath)) {
+        if (pErrorCode) *pErrorCode = GetLastError();
+        return false;
+    }
+
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.lpVerb = L"runas";       // require admin
+    sei.lpFile = batchPath;      // whole path
+    sei.nShow = SW_SHOW;
+    
+    if (bWait) {
+        sei.fMask = SEE_MASK_NOCLOSEPROCESS; 
+    }
+
+    if (!ShellExecuteExW(&sei)) {
+        const DWORD err = GetLastError();
+        if (pErrorCode) *pErrorCode = err;
+        return false;
+    }
+
+    // if needed, wait for result.
+    if (bWait && sei.hProcess) {
+        WaitForSingleObject(sei.hProcess, INFINITE);
+        CloseHandle(sei.hProcess);
+    }
+
+    return true;
+}
+
 namespace hardware_simulator {
 
 // static
@@ -320,7 +430,22 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     } else {
         result->Error("NullArguments", "Arguments are null for doControlAction");
     }
-  }
+  } else if (method_call.method_name().compare("registerService") == 0) {
+        DWORD dword;
+        RunBatchAsAdmin(L"service.bat", &dword, true);
+        result->Success(flutter::EncodableValue());
+  } else if (method_call.method_name().compare("unregisterService") == 0) {
+        DWORD dword;
+        RunBatchAsAdmin(L"unregisterservice.bat", &dword, false);
+        result->Success(flutter::EncodableValue());
+  } else if (method_call.method_name().compare("isRunningAsSystem") == 0) {
+        if (IsRunningAsSystem()) {
+            result->Success(flutter::EncodableValue(true));
+        }
+        else {
+            result->Success(flutter::EncodableValue(false));
+        }
+  } 
   else {
     result->NotImplemented();
   }
