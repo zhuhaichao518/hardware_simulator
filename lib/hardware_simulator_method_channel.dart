@@ -72,14 +72,13 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     }
     methodChannel.invokeMethod('unregisterService');
   }
-  
+
   @override
-  Future<bool> isRunningAsSystem() async{
+  Future<bool> isRunningAsSystem() async {
     if (!Platform.isWindows) {
       return true;
     }
-    final result =
-        await methodChannel.invokeMethod<bool>('isRunningAsSystem');
+    final result = await methodChannel.invokeMethod<bool>('isRunningAsSystem');
     return result!;
   }
 

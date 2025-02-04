@@ -48,7 +48,7 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     return;
   }
 
-  Future<bool> isRunningAsSystem() async{
+  Future<bool> isRunningAsSystem() async {
     return true;
   }
 

@@ -432,7 +432,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     }
   } else if (method_call.method_name().compare("registerService") == 0) {
         DWORD dword;
-        RunBatchAsAdmin(L"service.bat", &dword, false);
+        RunBatchAsAdmin(L"service.bat", &dword, true);
         result->Success(flutter::EncodableValue());
   } else if (method_call.method_name().compare("unregisterService") == 0) {
         DWORD dword;
