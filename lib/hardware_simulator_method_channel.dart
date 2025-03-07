@@ -82,6 +82,16 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     return result!;
   }
 
+  @override
+  Future<void> showNotification(String content) async {
+    if (!Platform.isWindows) {
+      return;
+    }
+    methodChannel.invokeMethod('showNotification', {
+      'content': content,
+    });
+  }
+
   final List<CursorMovedCallback> cursorMovedCallbacks = [];
 
   @override

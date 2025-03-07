@@ -192,6 +192,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     controller?.simulate("0 0 0 0 0 0 0");
   }
 
+  void _showNotification() async {
+    HardwareSimulator.showNotification("啦啦啦");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -212,6 +216,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
                 onPressed: _moveMouseAbsolute,
                 child: Text('Move Mouse to X, Y')),
+            ElevatedButton(
+                onPressed: _showNotification,
+                child: Text('show notification')),
           ],
         ),
         SizedBox(height: 20),

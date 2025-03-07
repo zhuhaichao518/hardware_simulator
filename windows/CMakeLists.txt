@@ -24,6 +24,8 @@ list(APPEND PLUGIN_SOURCES
   "cursor_monitor.h"
   "gamecontroller_manager.cc"
   "gamecontroller_manager.h"
+  "notification_window.cc"
+  "notification_window.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment

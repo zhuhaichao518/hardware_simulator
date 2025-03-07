@@ -2,6 +2,7 @@
 
 #include "cursor_monitor.h"
 #include "gamecontroller_manager.h"
+#include "notification_window.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -338,6 +339,15 @@ void hscroll(int distance) {
     send_input(i);
 }
 
+std::wstring stringToWstring(const std::string& str) {
+    int wideCharLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+    if (wideCharLen <= 0) return L"";
+
+    std::wstring wstr(wideCharLen - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], wideCharLen);
+    return wstr;
+}
+
 void HardwareSimulatorPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -445,6 +455,9 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         else {
             result->Success(flutter::EncodableValue(false));
         }
+  } else if (method_call.method_name().compare("showNotification") == 0) {
+        auto content = static_cast<std::string>(std::get<std::string>((args->find(flutter::EncodableValue("content")))->second));
+        NotificationWindow::Show(stringToWstring(content));
   } 
   else {
     result->NotImplemented();

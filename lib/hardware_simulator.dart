@@ -79,6 +79,10 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.isRunningAsSystem();
   }
 
+  static Future<void> showNotification(String content) {
+    return HardwareSimulatorPlatform.instance.showNotification(content);
+  }
+
   static Future<void> lockCursor() async {
     cursorlocked = true;
     return HardwareSimulatorPlatform.instance.lockCursor();
