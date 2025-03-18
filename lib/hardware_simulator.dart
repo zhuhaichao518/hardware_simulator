@@ -67,7 +67,7 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.getMonitorCount();
   }
 
-  static Future<void> registerService() {
+  static Future<bool> registerService() {
     return HardwareSimulatorPlatform.instance.registerService();
   }
 

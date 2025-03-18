@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'dart:html';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -58,11 +58,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<void> registerService() async {
+  Future<bool> registerService() async {
     if (!Platform.isWindows) {
-      return;
+      return false;
     }
-    methodChannel.invokeMethod('registerService');
+    bool result = await methodChannel.invokeMethod('registerService');
+    return result;
   }
 
   @override

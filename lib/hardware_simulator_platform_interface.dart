@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'hardware_simulator_method_channel.dart';
@@ -40,8 +41,8 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     return 1;
   }
 
-  Future<void> registerService() async {
-    return;
+  Future<bool> registerService() async {
+    return false;
   }
 
   Future<void> unregisterService() async {
