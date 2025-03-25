@@ -64,7 +64,7 @@ int GetDpiFromTemporaryWindow() {
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(
-        0, L"TempDpiWindowClass", L"", WS_OVERLAPPEDWINDOW,
+        WS_EX_NOACTIVATE, L"TempDpiWindowClass", L"", WS_OVERLAPPEDWINDOW,
         0, 0, 100, 100, NULL, NULL, GetModuleHandle(NULL), NULL);
 
     int dpi = 96;
@@ -92,10 +92,10 @@ void NotificationWindow::CreateAndShowWindow() {
     int y = screenHeight - WINDOW_HEIGHT - (int)(40 * dpi);
 
     hwnd = CreateWindowEx(
-        WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+        WS_EX_NOACTIVATE |WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
         CLASS_NAME,
         L"Notification",
-        WS_POPUP,
+        WS_POPUP /*| WS_DISABLED*/,
         x, y,
         WINDOW_WIDTH,
         WINDOW_HEIGHT,
