@@ -217,8 +217,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 onPressed: _moveMouseAbsolute,
                 child: Text('Move Mouse to X, Y')),
             ElevatedButton(
-                onPressed: _showNotification,
-                child: Text('show notification')),
+                onPressed: _showNotification, child: Text('show notification')),
           ],
         ),
         SizedBox(height: 20),
