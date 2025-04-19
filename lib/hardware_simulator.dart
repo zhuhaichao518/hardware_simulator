@@ -150,11 +150,11 @@ class HardwareSimulator {
     return HWMouse();
   }
 
-  void performTouchEvent(double x, double y, int touchId, bool isDown) {
+  static void performTouchEvent(double x, double y, int touchId, bool isDown) {
     HardwareSimulatorPlatform.instance.performTouchEvent(x, y, touchId, isDown);
   }
 
-  void performTouchMove(double x, double y, int touchId) {
+  static void performTouchMove(double x, double y, int touchId) {
     HardwareSimulatorPlatform.instance.performTouchMove(x, y, touchId);
   }
 
