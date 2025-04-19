@@ -30,18 +30,6 @@ class HWMouse {
   }
 }
 
-class HWTouch {
-  HWTouch();
-  
-  void performTouchEvent(double x, double y, int touchId, bool isDown) {
-    HardwareSimulatorPlatform.instance.performTouchEvent(x, y, touchId, isDown);
-  }
-
-  void performTouchMove(double x, double y, int touchId) {
-    HardwareSimulatorPlatform.instance.performTouchMove(x, y, touchId);
-  }
-}
-
 class GameController {
   int controllerId;
 
@@ -162,8 +150,12 @@ class HardwareSimulator {
     return HWMouse();
   }
 
-  HWTouch getTouch() {
-    return HWTouch();
+  void performTouchEvent(double x, double y, int touchId, bool isDown) {
+    HardwareSimulatorPlatform.instance.performTouchEvent(x, y, touchId, isDown);
+  }
+
+  void performTouchMove(double x, double y, int touchId) {
+    HardwareSimulatorPlatform.instance.performTouchMove(x, y, touchId);
   }
 
   static Future<GameController?> createGameController() {
