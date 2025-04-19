@@ -26,23 +26,40 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
-// 定义触摸事件相关的函数指针
 typedef HSYNTHETICPOINTERDEVICE(WINAPI* PFN_CreateSyntheticPointerDevice)(POINTER_INPUT_TYPE pointerType, ULONG maxCount, POINTER_FEEDBACK_MODE mode);
 typedef BOOL(WINAPI* PFN_InjectSyntheticPointerInput)(HSYNTHETICPOINTERDEVICE device, CONST POINTER_TYPE_INFO* pointerInfo, UINT32 count);
 typedef VOID(WINAPI* PFN_DestroySyntheticPointerDevice)(HSYNTHETICPOINTERDEVICE device);
 
-// 全局变量
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 PFN_CreateSyntheticPointerDevice fnCreateSyntheticPointerDevice = nullptr;
 PFN_InjectSyntheticPointerInput fnInjectSyntheticPointerInput = nullptr;
 PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 
-// 触摸设备句柄
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
-POINTER_TYPE_INFO g_touchInfo[10] = {};  // 支持最多10个触摸点
+POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
 
-// 初始化触摸API
+//Todo:OpenInputDesktop should fail because we have a window resource in this process.
+//We need to create another process to handle this scenario.
+HDESK syncThreadDesktop() {
+    auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
+    if (!hDesk) {
+        //auto err = GetLastError();
+        //BOOST_LOG(error) << "Failed to Open Input Desktop [0x"sv << util::hex(err).to_string_view() << ']';
+
+        return nullptr;
+    }
+
+    if (!SetThreadDesktop(hDesk)) {
+        //auto err = GetLastError();
+        //BOOST_LOG(error) << "Failed to sync desktop to thread [0x"sv << util::hex(err).to_string_view() << ']';
+    }
+
+    CloseDesktop(hDesk);
+
+    return hDesk;
+}
+
 bool initTouchAPI() {
     HMODULE hUser32 = GetModuleHandleA("user32.dll");
     if (!hUser32) {
@@ -56,17 +73,18 @@ bool initTouchAPI() {
     return fnCreateSyntheticPointerDevice && fnInjectSyntheticPointerInput && fnDestroySyntheticPointerDevice;
 }
 
-// 创建虚拟触摸设备
 bool createTouchDevice() {
     if (!fnCreateSyntheticPointerDevice) {
-        return false;
+        initTouchAPI();
+        if (!fnCreateSyntheticPointerDevice) {
+            return false;
+        }
     }
 
     g_touchDevice = fnCreateSyntheticPointerDevice(PT_TOUCH, ARRAYSIZE(g_touchInfo), POINTER_FEEDBACK_DEFAULT);
     return g_touchDevice != nullptr;
 }
 
-// 销毁虚拟触摸设备
 void destroyTouchDevice() {
     if (g_touchDevice && fnDestroySyntheticPointerDevice) {
         fnDestroySyntheticPointerDevice(g_touchDevice);
@@ -74,52 +92,51 @@ void destroyTouchDevice() {
     }
 }
 
-// 同步输入桌面
-HDESK syncThreadDesktop() {
-    auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
-    if (!hDesk) {
-        return nullptr;
-    }
-
-    if (!SetThreadDesktop(hDesk)) {
-        // 处理错误
-    }
-
-    CloseDesktop(hDesk);
-    return hDesk;
-}
-
-// 发送触摸输入
 bool sendTouchInput() {
     if (!g_touchDevice || !fnInjectSyntheticPointerInput) {
         return false;
     }
 
-    while (true) {
-        if (fnInjectSyntheticPointerInput(g_touchDevice, g_touchInfo, g_activeTouchSlots)) {
-            return true;
-        }
-
-        auto hDesk = syncThreadDesktop();
-        if (_lastKnownInputDesktop != hDesk) {
-            _lastKnownInputDesktop = hDesk;
-        } else {
-            break;
-        }
+    if (fnInjectSyntheticPointerInput(g_touchDevice, g_touchInfo, g_activeTouchSlots)) {
+        return true;
     }
 
     return false;
 }
 
-// 处理触摸事件
-void performTouchEvent(double x, double y, int touchId, bool isDown) {
+void async_send_touch_input_retry() {
+    while (true) {
+        auto send = sendTouchInput();
+        if (send == 1) {
+            break;
+        }
+
+        auto hDesk = syncThreadDesktop();
+        if (_lastKnownInputDesktop != hDesk) {
+            _lastKnownInputDesktop = hDesk;
+        }
+        else {
+            break;
+        }
+    }
+}
+
+void send_touch_input() {
+    auto send = sendTouchInput();
+    if (send != true) {
+        // put resend into new thread.
+        std::future<void> retry_future = std::async(std::launch::async, async_send_touch_input_retry);
+        retry_future.wait();
+    }
+}
+
+void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
     if (!g_touchDevice) {
         if (!createTouchDevice()) {
             return;
         }
     }
 
-    // 查找或分配触摸点
     POINTER_TYPE_INFO* pointer = nullptr;
     for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
         if (g_touchInfo[i].touchInfo.pointerInfo.pointerId == touchId) {
@@ -129,12 +146,11 @@ void performTouchEvent(double x, double y, int touchId, bool isDown) {
     }
 
     if (!pointer) {
-        // 分配新的触摸点
         for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
             if (g_touchInfo[i].touchInfo.pointerInfo.pointerFlags == POINTER_FLAG_NONE) {
                 pointer = &g_touchInfo[i];
                 g_touchInfo[i].touchInfo.pointerInfo.pointerId = touchId;
-                g_activeTouchSlots = std::max(g_activeTouchSlots, i + 1);
+                g_activeTouchSlots = (g_activeTouchSlots > (i + 1)) ? g_activeTouchSlots : (i + 1);
                 break;
             }
         }
@@ -144,45 +160,36 @@ void performTouchEvent(double x, double y, int touchId, bool isDown) {
         return;
     }
 
-    // 设置触摸点信息
     pointer->type = PT_TOUCH;
     auto& touchInfo = pointer->touchInfo;
     touchInfo.pointerInfo.pointerType = PT_TOUCH;
 
-    // 设置触摸位置(转换为屏幕坐标)
-    touchInfo.pointerInfo.ptPixelLocation.x = x * GetSystemMetrics(SM_CXSCREEN);
-    touchInfo.pointerInfo.ptPixelLocation.y = y * GetSystemMetrics(SM_CYSCREEN);
+    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CXSCREEN));
 
-    // 设置触摸标志
     if (isDown) {
         touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
     } else {
         touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_UP;
     }
 
-    // 设置触摸掩码
     touchInfo.touchMask = TOUCH_MASK_CONTACTAREA | TOUCH_MASK_ORIENTATION | TOUCH_MASK_PRESSURE;
 
-    // 设置接触区域
     touchInfo.rcContact.left = touchInfo.pointerInfo.ptPixelLocation.x - 10;
     touchInfo.rcContact.right = touchInfo.pointerInfo.ptPixelLocation.x + 10;
     touchInfo.rcContact.top = touchInfo.pointerInfo.ptPixelLocation.y - 10;
     touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
 
-    // 设置压力值
     touchInfo.pressure = 1024;
 
-    // 发送触摸输入
-    sendTouchInput();
+    send_touch_input();
 }
 
-// 处理触摸移动
-void performTouchMove(double x, double y, int touchId) {
+void performTouchMove(double x, double y, uint32_t touchId) {
     if (!g_touchDevice) {
         return;
     }
 
-    // 查找触摸点
     POINTER_TYPE_INFO* pointer = nullptr;
     for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
         if (g_touchInfo[i].touchInfo.pointerInfo.pointerId == touchId) {
@@ -195,20 +202,18 @@ void performTouchMove(double x, double y, int touchId) {
         return;
     }
 
-    // 更新触摸位置
     auto& touchInfo = pointer->touchInfo;
-    touchInfo.pointerInfo.ptPixelLocation.x = x * GetSystemMetrics(SM_CXSCREEN);
-    touchInfo.pointerInfo.ptPixelLocation.y = y * GetSystemMetrics(SM_CYSCREEN);
+
+    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
     touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE;
 
-    // 更新接触区域
     touchInfo.rcContact.left = touchInfo.pointerInfo.ptPixelLocation.x - 10;
     touchInfo.rcContact.right = touchInfo.pointerInfo.ptPixelLocation.x + 10;
     touchInfo.rcContact.top = touchInfo.pointerInfo.ptPixelLocation.y - 10;
     touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
 
-    // 发送触摸输入
-    sendTouchInput();
+    send_touch_input();
 }
 
 BOOL IsRunningAsSystem() {
@@ -340,27 +345,6 @@ HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
     destroyTouchDevice();
 }
 
-//Todo:OpenInputDesktop should fail because we have a window resource in this process.
-//We need to create another process to handle this scenario.
-HDESK syncThreadDesktop() {
-    auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
-    if (!hDesk) {
-        //auto err = GetLastError();
-        //BOOST_LOG(error) << "Failed to Open Input Desktop [0x"sv << util::hex(err).to_string_view() << ']';
-
-        return nullptr;
-    }
-
-    if (!SetThreadDesktop(hDesk)) {
-        //auto err = GetLastError();
-        //BOOST_LOG(error) << "Failed to sync desktop to thread [0x"sv << util::hex(err).to_string_view() << ']';
-    }
-
-    CloseDesktop(hDesk);
-
-    return hDesk;
-}
-
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 
 void async_send_input_retry(INPUT& i) {
@@ -383,7 +367,7 @@ void async_send_input_retry(INPUT& i) {
 void send_input(INPUT& i) {
     auto send = SendInput(1, &i, sizeof(INPUT));
     if (send != 1) {
-        // 将重试逻辑放到新线程中
+        // put resend into new thread.
         std::future<void> retry_future = std::async(std::launch::async, async_send_input_retry, std::ref(i));
         retry_future.wait();
     }
@@ -652,7 +636,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         performTouchEvent(
             static_cast<double>(std::get<double>((x))),
             static_cast<double>(std::get<double>((y))),
-            static_cast<int>(std::get<int>((touchId))),
+            static_cast<uint32_t>(std::get<int>((touchId))),
             static_cast<bool>(std::get<bool>((isDown)))
         );
         result->Success(nullptr);
@@ -663,7 +647,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         performTouchMove(
             static_cast<double>(std::get<double>((x))),
             static_cast<double>(std::get<double>((y))),
-            static_cast<int>(std::get<int>((touchId)))
+            static_cast<uint32_t>(std::get<int>((touchId)))
         );
         result->Success(nullptr);
   } else {

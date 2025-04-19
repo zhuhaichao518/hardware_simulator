@@ -203,21 +203,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     double x = double.tryParse(touchXController.text) ?? 0;
     double y = double.tryParse(touchYController.text) ?? 0;
     int touchId = int.tryParse(touchIdController.text) ?? 1;
-    hardwareSimulator.getTouch().performTouchEvent(x, y, touchId, true);
+    hardwareSimulator.performTouchEvent(x, y, touchId, true);
   }
 
   void _touchMove() {
     double x = double.tryParse(touchXController.text) ?? 0;
     double y = double.tryParse(touchYController.text) ?? 0;
     int touchId = int.tryParse(touchIdController.text) ?? 1;
-    hardwareSimulator.getTouch().performTouchMove(x, y, touchId);
+    hardwareSimulator.performTouchMove(x, y, touchId);
   }
 
   void _touchUp() {
     double x = double.tryParse(touchXController.text) ?? 0;
     double y = double.tryParse(touchYController.text) ?? 0;
     int touchId = int.tryParse(touchIdController.text) ?? 1;
-    hardwareSimulator.getTouch().performTouchEvent(x, y, touchId, false);
+    hardwareSimulator.performTouchEvent(x, y, touchId, false);
   }
 
   @override
