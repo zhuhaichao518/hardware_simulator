@@ -26,6 +26,195 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
+typedef HSYNTHETICPOINTERDEVICE(WINAPI* PFN_CreateSyntheticPointerDevice)(POINTER_INPUT_TYPE pointerType, ULONG maxCount, POINTER_FEEDBACK_MODE mode);
+typedef BOOL(WINAPI* PFN_InjectSyntheticPointerInput)(HSYNTHETICPOINTERDEVICE device, CONST POINTER_TYPE_INFO* pointerInfo, UINT32 count);
+typedef VOID(WINAPI* PFN_DestroySyntheticPointerDevice)(HSYNTHETICPOINTERDEVICE device);
+
+thread_local HDESK _lastKnownInputDesktop = nullptr;
+PFN_CreateSyntheticPointerDevice fnCreateSyntheticPointerDevice = nullptr;
+PFN_InjectSyntheticPointerInput fnInjectSyntheticPointerInput = nullptr;
+PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
+
+HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
+POINTER_TYPE_INFO g_touchInfo[10] = {};
+UINT32 g_activeTouchSlots = 0;
+
+//Todo:OpenInputDesktop should fail because we have a window resource in this process.
+//We need to create another process to handle this scenario.
+HDESK syncThreadDesktop() {
+    auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
+    if (!hDesk) {
+        //auto err = GetLastError();
+        //BOOST_LOG(error) << "Failed to Open Input Desktop [0x"sv << util::hex(err).to_string_view() << ']';
+
+        return nullptr;
+    }
+
+    if (!SetThreadDesktop(hDesk)) {
+        //auto err = GetLastError();
+        //BOOST_LOG(error) << "Failed to sync desktop to thread [0x"sv << util::hex(err).to_string_view() << ']';
+    }
+
+    CloseDesktop(hDesk);
+
+    return hDesk;
+}
+
+bool initTouchAPI() {
+    HMODULE hUser32 = GetModuleHandleA("user32.dll");
+    if (!hUser32) {
+        return false;
+    }
+
+    fnCreateSyntheticPointerDevice = (PFN_CreateSyntheticPointerDevice)GetProcAddress(hUser32, "CreateSyntheticPointerDevice");
+    fnInjectSyntheticPointerInput = (PFN_InjectSyntheticPointerInput)GetProcAddress(hUser32, "InjectSyntheticPointerInput");
+    fnDestroySyntheticPointerDevice = (PFN_DestroySyntheticPointerDevice)GetProcAddress(hUser32, "DestroySyntheticPointerDevice");
+
+    return fnCreateSyntheticPointerDevice && fnInjectSyntheticPointerInput && fnDestroySyntheticPointerDevice;
+}
+
+bool createTouchDevice() {
+    if (!fnCreateSyntheticPointerDevice) {
+        initTouchAPI();
+        if (!fnCreateSyntheticPointerDevice) {
+            return false;
+        }
+    }
+
+    g_touchDevice = fnCreateSyntheticPointerDevice(PT_TOUCH, ARRAYSIZE(g_touchInfo), POINTER_FEEDBACK_DEFAULT);
+    return g_touchDevice != nullptr;
+}
+
+void destroyTouchDevice() {
+    if (g_touchDevice && fnDestroySyntheticPointerDevice) {
+        fnDestroySyntheticPointerDevice(g_touchDevice);
+        g_touchDevice = nullptr;
+    }
+}
+
+bool sendTouchInput() {
+    if (!g_touchDevice || !fnInjectSyntheticPointerInput) {
+        return false;
+    }
+
+    if (fnInjectSyntheticPointerInput(g_touchDevice, g_touchInfo, g_activeTouchSlots)) {
+        return true;
+    }
+
+    return false;
+}
+
+void async_send_touch_input_retry() {
+    while (true) {
+        auto send = sendTouchInput();
+        if (send == 1) {
+            break;
+        }
+
+        auto hDesk = syncThreadDesktop();
+        if (_lastKnownInputDesktop != hDesk) {
+            _lastKnownInputDesktop = hDesk;
+        }
+        else {
+            break;
+        }
+    }
+}
+
+void send_touch_input() {
+    auto send = sendTouchInput();
+    if (send != true) {
+        // put resend into new thread.
+        std::future<void> retry_future = std::async(std::launch::async, async_send_touch_input_retry);
+        retry_future.wait();
+    }
+}
+
+void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
+    if (!g_touchDevice) {
+        if (!createTouchDevice()) {
+            return;
+        }
+    }
+
+    POINTER_TYPE_INFO* pointer = nullptr;
+    for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
+        if (g_touchInfo[i].touchInfo.pointerInfo.pointerId == touchId) {
+            pointer = &g_touchInfo[i];
+            break;
+        }
+    }
+
+    if (!pointer) {
+        for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
+            if (g_touchInfo[i].touchInfo.pointerInfo.pointerFlags == POINTER_FLAG_NONE) {
+                pointer = &g_touchInfo[i];
+                g_touchInfo[i].touchInfo.pointerInfo.pointerId = touchId;
+                g_activeTouchSlots = (g_activeTouchSlots > (i + 1)) ? g_activeTouchSlots : (i + 1);
+                break;
+            }
+        }
+    }
+
+    if (!pointer) {
+        return;
+    }
+
+    pointer->type = PT_TOUCH;
+    auto& touchInfo = pointer->touchInfo;
+    touchInfo.pointerInfo.pointerType = PT_TOUCH;
+
+    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CXSCREEN));
+
+    if (isDown) {
+        touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
+    } else {
+        touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_UP;
+    }
+
+    touchInfo.touchMask = TOUCH_MASK_CONTACTAREA | TOUCH_MASK_ORIENTATION | TOUCH_MASK_PRESSURE;
+
+    touchInfo.rcContact.left = touchInfo.pointerInfo.ptPixelLocation.x - 10;
+    touchInfo.rcContact.right = touchInfo.pointerInfo.ptPixelLocation.x + 10;
+    touchInfo.rcContact.top = touchInfo.pointerInfo.ptPixelLocation.y - 10;
+    touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
+
+    touchInfo.pressure = 1024;
+
+    send_touch_input();
+}
+
+void performTouchMove(double x, double y, uint32_t touchId) {
+    if (!g_touchDevice) {
+        return;
+    }
+
+    POINTER_TYPE_INFO* pointer = nullptr;
+    for (UINT32 i = 0; i < ARRAYSIZE(g_touchInfo); i++) {
+        if (g_touchInfo[i].touchInfo.pointerInfo.pointerId == touchId) {
+            pointer = &g_touchInfo[i];
+            break;
+        }
+    }
+
+    if (!pointer) {
+        return;
+    }
+
+    auto& touchInfo = pointer->touchInfo;
+
+    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
+    touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE;
+
+    touchInfo.rcContact.left = touchInfo.pointerInfo.ptPixelLocation.x - 10;
+    touchInfo.rcContact.right = touchInfo.pointerInfo.ptPixelLocation.x + 10;
+    touchInfo.rcContact.top = touchInfo.pointerInfo.ptPixelLocation.y - 10;
+    touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
+
+    send_touch_input();
+}
 
 BOOL IsRunningAsSystem() {
     BOOL bIsSystem = FALSE;
@@ -152,27 +341,8 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
 
 HardwareSimulatorPlugin::HardwareSimulatorPlugin() {}
 
-HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {}
-
-//Todo:OpenInputDesktop should fail because we have a window resource in this process.
-//We need to create another process to handle this scenario.
-HDESK syncThreadDesktop() {
-    auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
-    if (!hDesk) {
-        //auto err = GetLastError();
-        //BOOST_LOG(error) << "Failed to Open Input Desktop [0x"sv << util::hex(err).to_string_view() << ']';
-
-        return nullptr;
-    }
-
-    if (!SetThreadDesktop(hDesk)) {
-        //auto err = GetLastError();
-        //BOOST_LOG(error) << "Failed to sync desktop to thread [0x"sv << util::hex(err).to_string_view() << ']';
-    }
-
-    CloseDesktop(hDesk);
-
-    return hDesk;
+HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
+    destroyTouchDevice();
 }
 
 thread_local HDESK _lastKnownInputDesktop = nullptr;
@@ -197,7 +367,7 @@ void async_send_input_retry(INPUT& i) {
 void send_input(INPUT& i) {
     auto send = SendInput(1, &i, sizeof(INPUT));
     if (send != 1) {
-        // 将重试逻辑放到新线程中
+        // put resend into new thread.
         std::future<void> retry_future = std::async(std::launch::async, async_send_input_retry, std::ref(i));
         retry_future.wait();
     }
@@ -458,8 +628,29 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("showNotification") == 0) {
         auto content = static_cast<std::string>(std::get<std::string>((args->find(flutter::EncodableValue("content")))->second));
         NotificationWindow::Show(stringToWstring(content));
-  } 
-  else {
+  } else if (method_call.method_name().compare("touchEvent") == 0) {
+        auto x = (args->find(flutter::EncodableValue("x")))->second;
+        auto y = (args->find(flutter::EncodableValue("y")))->second;
+        auto touchId = (args->find(flutter::EncodableValue("touchId")))->second;
+        auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
+        performTouchEvent(
+            static_cast<double>(std::get<double>((x))),
+            static_cast<double>(std::get<double>((y))),
+            static_cast<uint32_t>(std::get<int>((touchId))),
+            static_cast<bool>(std::get<bool>((isDown)))
+        );
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("touchMove") == 0) {
+        auto x = (args->find(flutter::EncodableValue("x")))->second;
+        auto y = (args->find(flutter::EncodableValue("y")))->second;
+        auto touchId = (args->find(flutter::EncodableValue("touchId")))->second;
+        performTouchMove(
+            static_cast<double>(std::get<double>((x))),
+            static_cast<double>(std::get<double>((y))),
+            static_cast<uint32_t>(std::get<int>((touchId)))
+        );
+        result->Success(nullptr);
+  } else {
     result->NotImplemented();
   }
 }
