@@ -34,6 +34,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   final TextEditingController relXController = TextEditingController();
   final TextEditingController relYController = TextEditingController();
   final TextEditingController keyController = TextEditingController();
+  final TextEditingController touchXController = TextEditingController();
+  final TextEditingController touchYController = TextEditingController();
+  final TextEditingController touchIdController = TextEditingController();
 
   final HardwareSimulator hardwareSimulator = HardwareSimulator();
 
@@ -196,6 +199,27 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.showNotification("啦啦啦");
   }
 
+  void _touchDown() {
+    double x = double.tryParse(touchXController.text) ?? 0;
+    double y = double.tryParse(touchYController.text) ?? 0;
+    int touchId = int.tryParse(touchIdController.text) ?? 1;
+    hardwareSimulator.getTouch().performTouchEvent(x, y, touchId, true);
+  }
+
+  void _touchMove() {
+    double x = double.tryParse(touchXController.text) ?? 0;
+    double y = double.tryParse(touchYController.text) ?? 0;
+    int touchId = int.tryParse(touchIdController.text) ?? 1;
+    hardwareSimulator.getTouch().performTouchMove(x, y, touchId);
+  }
+
+  void _touchUp() {
+    double x = double.tryParse(touchXController.text) ?? 0;
+    double y = double.tryParse(touchYController.text) ?? 0;
+    int touchId = int.tryParse(touchIdController.text) ?? 1;
+    hardwareSimulator.getTouch().performTouchEvent(x, y, touchId, false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -299,6 +323,53 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 onPressed: _pressAbutton, child: Text('press up button')),
             ElevatedButton(
                 onPressed: _releaseAbutton, child: Text('release up button')),
+          ],
+        ),
+        SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: touchXController,
+                decoration: InputDecoration(labelText: 'Touch X (0-1)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: touchYController,
+                decoration: InputDecoration(labelText: 'Touch Y (0-1)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: touchIdController,
+                decoration: InputDecoration(labelText: 'Touch ID'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _touchDown,
+              child: Text('Touch Down'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _touchMove,
+              child: Text('Touch Move'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _touchUp,
+              child: Text('Touch Up'),
+            ),
           ],
         ),
       ],

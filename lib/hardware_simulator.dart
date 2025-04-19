@@ -1,4 +1,5 @@
 import 'hardware_simulator_platform_interface.dart';
+import 'package:flutter/services.dart';
 
 class HWKeyboard {
   HWKeyboard();
@@ -29,6 +30,18 @@ class HWMouse {
   }
 }
 
+class HWTouch {
+  HWTouch();
+  
+  void performTouchEvent(double x, double y, int touchId, bool isDown) {
+    HardwareSimulatorPlatform.instance.performTouchEvent(x, y, touchId, isDown);
+  }
+
+  void performTouchMove(double x, double y, int touchId) {
+    HardwareSimulatorPlatform.instance.performTouchMove(x, y, touchId);
+  }
+}
+
 class GameController {
   int controllerId;
 
@@ -52,6 +65,8 @@ class GameController {
 }
 
 class HardwareSimulator {
+  static const MethodChannel _channel = MethodChannel('hardware_simulator');
+
   //For keyboard and mouse, it is a singleton. For other hardwares like game controllers,
   //it should be plugged in and then used.
   static HWKeyboard keyboard = HWKeyboard();
@@ -140,11 +155,15 @@ class HardwareSimulator {
   }
 
   HWKeyboard getKeyboard() {
-    return keyboard;
+    return HWKeyboard();
   }
 
   HWMouse getMouse() {
-    return mouse;
+    return HWMouse();
+  }
+
+  HWTouch getTouch() {
+    return HWTouch();
   }
 
   static Future<GameController?> createGameController() {
