@@ -165,7 +165,7 @@ void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
     touchInfo.pointerInfo.pointerType = PT_TOUCH;
 
     touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
-    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
 
     if (isDown) {
         touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
