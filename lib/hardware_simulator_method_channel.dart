@@ -51,8 +51,9 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<int?> getMonitorCount() async {
-    if (kIsWeb || Platform.isAndroid || Platform.isIOS || Platform.isWindows)
+    if (kIsWeb || Platform.isAndroid || Platform.isIOS) {
       return 1;
+    }
     final count = await methodChannel.invokeMethod('getMonitorCount');
     return count;
   }

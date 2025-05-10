@@ -533,6 +533,9 @@ void HardwareSimulatorPlugin::HandleMethodCall(
       version_stream << "7";
     }
     result->Success(flutter::EncodableValue(version_stream.str()));
+  } else if (method_call.method_name().compare("getMonitorCount") == 0) {
+    int monitorCount = GetSystemMetrics(SM_CMONITORS);
+    result->Success(flutter::EncodableValue(monitorCount));
   } else if (method_call.method_name().compare("KeyPress") == 0) {
         auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
         auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
