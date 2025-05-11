@@ -129,11 +129,11 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   // Touch event simulation
-  Future<void> performTouchEvent(double x, double y, int touchId, bool isDown) async {
+  Future<void> performTouchEvent(double x, double y, int touchId, bool isDown, int screenId) async {
     throw UnimplementedError('performTouchEvent() has not been implemented.');
   }
 
-  Future<void> performTouchMove(double x, double y, int touchId) async {
+  Future<void> performTouchMove(double x, double y, int touchId, int screenId) async {
     throw UnimplementedError('performTouchMove() has not been implemented.');
   }
 

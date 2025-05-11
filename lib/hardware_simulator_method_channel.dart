@@ -179,21 +179,23 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<void> performTouchEvent(double x, double y, int touchId, bool isDown) async {
+  Future<void> performTouchEvent(double x, double y, int touchId, bool isDown, int screenId) async {
     await methodChannel.invokeMethod('touchEvent', {
       'x': x,
       'y': y,
       'touchId': touchId,
       'isDown': isDown,
+      'screenId': screenId,
     });
   }
 
   @override
-  Future<void> performTouchMove(double x, double y, int touchId) async {
+  Future<void> performTouchMove(double x, double y, int touchId, int screenId) async {
     await methodChannel.invokeMethod('touchMove', {
       'x': x,
       'y': y,
       'touchId': touchId,
+      'screenId': screenId,
     });
   }
 

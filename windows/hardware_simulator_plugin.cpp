@@ -14,6 +14,7 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
+#include <algorithm>
 #include <future>
 #include <memory>
 #include <sstream>
@@ -140,8 +141,6 @@ HWND CreateHiddenMessageWindow() {
 }
 
 void adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
-    //TODO:remove
-    update_monitors();
     auto monitors = get_monitors();
     if (screen_index < 0 || screen_index >= monitors.size()) return;
 
@@ -155,6 +154,35 @@ void adjust_to_main_screen(int screen_index, double x_percent, double y_percent,
 
     out_x = static_cast<LONG>(ox * (65535.0f / primary_width));
     out_y = static_cast<LONG>(oy * (65535.0f / primary_height));
+}
+
+void adjust_touch_to_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
+    auto monitors = get_monitors();
+    if (monitors.empty() || screen_index < 0 || screen_index >= monitors.size()) {
+        out_x = out_y = 0;
+        return;
+    }
+
+    RECT global_bounds = {0};
+    for (const auto& monitor : monitors) {
+        global_bounds.left = (std::min)(global_bounds.left, monitor.rect.left);
+        global_bounds.top = (std::min)(global_bounds.top, monitor.rect.top);
+        global_bounds.right = (std::max)(global_bounds.right, monitor.rect.right);
+        global_bounds.bottom = (std::max)(global_bounds.bottom, monitor.rect.bottom);
+    }
+
+    const auto& screen = monitors[screen_index];
+    
+    double global_x = (screen.rect.left - global_bounds.left + 
+                      (screen.rect.right - screen.rect.left) * x_percent) / 
+                     (global_bounds.right - global_bounds.left);
+    
+    double global_y = (screen.rect.top - global_bounds.top + 
+                      (screen.rect.bottom - screen.rect.top) * y_percent) / 
+                     (global_bounds.bottom - global_bounds.top);
+
+    out_x = static_cast<LONG>(global_x * GetSystemMetrics(SM_CXVIRTUALSCREEN));
+    out_y = static_cast<LONG>(global_y * GetSystemMetrics(SM_CYVIRTUALSCREEN));
 }
 
 bool initTouchAPI() {
@@ -227,7 +255,7 @@ void send_touch_input() {
     }
 }
 
-void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
+void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown) {
     if (!g_touchDevice) {
         if (!createTouchDevice()) {
             return;
@@ -261,8 +289,10 @@ void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
     auto& touchInfo = pointer->touchInfo;
     touchInfo.pointerInfo.pointerType = PT_TOUCH;
 
-    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
-    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
+    LONG out_x, out_y;
+    adjust_touch_to_screen(screenId,x,y,out_x,out_y);
+    touchInfo.pointerInfo.ptPixelLocation.x = out_x;//static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = out_y;//static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
 
     if (isDown) {
         touchInfo.pointerInfo.pointerFlags = TOUCHEVENTF_PRIMARY | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
@@ -282,7 +312,7 @@ void performTouchEvent(double x, double y, uint32_t touchId, bool isDown) {
     send_touch_input();
 }
 
-void performTouchMove(double x, double y, uint32_t touchId) {
+void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
     if (!g_touchDevice) {
         return;
     }
@@ -301,8 +331,11 @@ void performTouchMove(double x, double y, uint32_t touchId) {
 
     auto& touchInfo = pointer->touchInfo;
 
-    touchInfo.pointerInfo.ptPixelLocation.x = static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
-    touchInfo.pointerInfo.ptPixelLocation.y = static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
+    LONG out_x, out_y;
+    adjust_touch_to_screen(screenId, x, y, out_x, out_y);
+    touchInfo.pointerInfo.ptPixelLocation.x = out_x;//static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
+    touchInfo.pointerInfo.ptPixelLocation.y = out_y;//static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
+
     touchInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE;
 
     touchInfo.rcContact.left = touchInfo.pointerInfo.ptPixelLocation.x - 10;
@@ -737,11 +770,13 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto content = static_cast<std::string>(std::get<std::string>((args->find(flutter::EncodableValue("content")))->second));
         NotificationWindow::Show(stringToWstring(content));
   } else if (method_call.method_name().compare("touchEvent") == 0) {
+        auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
         auto x = (args->find(flutter::EncodableValue("x")))->second;
         auto y = (args->find(flutter::EncodableValue("y")))->second;
         auto touchId = (args->find(flutter::EncodableValue("touchId")))->second;
         auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
         performTouchEvent(
+            static_cast<int>(std::get<int>((screenId))),
             static_cast<double>(std::get<double>((x))),
             static_cast<double>(std::get<double>((y))),
             static_cast<uint32_t>(std::get<int>((touchId))),
@@ -749,10 +784,12 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         );
         result->Success(nullptr);
   } else if (method_call.method_name().compare("touchMove") == 0) {
+        auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
         auto x = (args->find(flutter::EncodableValue("x")))->second;
         auto y = (args->find(flutter::EncodableValue("y")))->second;
         auto touchId = (args->find(flutter::EncodableValue("touchId")))->second;
         performTouchMove(
+            static_cast<int>(std::get<int>((screenId))),
             static_cast<double>(std::get<double>((x))),
             static_cast<double>(std::get<double>((y))),
             static_cast<uint32_t>(std::get<int>((touchId)))
