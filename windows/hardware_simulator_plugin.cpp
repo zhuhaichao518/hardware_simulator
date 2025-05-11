@@ -60,6 +60,103 @@ HDESK syncThreadDesktop() {
     return hDesk;
 }
 
+struct MonitorInfo {
+    RECT rect;
+    bool is_primary;
+};
+
+std::vector<MonitorInfo> g_monitors;
+
+void update_monitors() {
+    g_monitors.clear();
+    EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
+        auto& list = *reinterpret_cast<std::vector<MonitorInfo>*>(data);
+        MONITORINFO info{ sizeof(MONITORINFO) };
+        GetMonitorInfo(hMon, &info);
+        list.push_back({ info.rcMonitor, (info.dwFlags & MONITORINFOF_PRIMARY) != 0 });
+        return TRUE;
+        }, reinterpret_cast<LPARAM>(&g_monitors));
+}
+
+std::vector<MonitorInfo> get_monitors() {
+    return g_monitors;
+}
+
+LRESULT CALLBACK DpiMonitorWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_DPICHANGED:
+            update_monitors();
+            break;
+        case WM_DISPLAYCHANGE:
+            update_monitors();
+            break; 
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+/*
+HWND CreateHiddenMessageWindow() {
+    WNDCLASS wc{};
+    wc.lpfnWndProc = DpiMonitorWndProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = L"DpiMonitorWindow";
+    RegisterClass(&wc);
+
+    return CreateWindowEx(0, wc.lpszClassName, nullptr, 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
+}*/
+
+HWND CreateHiddenMessageWindow() {
+    WNDCLASS wc{};
+    wc.lpfnWndProc = DpiMonitorWndProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = L"DpiMonitorWindow";
+
+    if (!RegisterClass(&wc)) {
+        //DWORD err = GetLastError();
+        //OutputDebugString(L"RegisterClass failed!");
+        return nullptr;
+    }
+
+    HWND hWnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        L"Hidden DPI Monitor",
+        WS_OVERLAPPEDWINDOW,
+        0, 0, 100, 100,
+        nullptr,
+        nullptr,
+        wc.hInstance,
+        nullptr
+    );
+
+    if (!hWnd) {
+        //DWORD err = GetLastError();
+        //OutputDebugString(L"CreateWindowEx failed!");
+        return nullptr;
+    }
+
+    ShowWindow(hWnd, SW_HIDE);
+    return hWnd;
+}
+
+void adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
+    //TODO:remove
+    update_monitors();
+    auto monitors = get_monitors();
+    if (screen_index < 0 || screen_index >= monitors.size()) return;
+
+    const auto& screen = monitors[screen_index];
+    int ox, oy;
+    ox = screen.rect.left + static_cast<int>((screen.rect.right - screen.rect.left) * x_percent);
+    oy = screen.rect.top + static_cast<int>((screen.rect.bottom - screen.rect.top) * y_percent);
+
+    int primary_width = GetSystemMetrics(SM_CXSCREEN);
+    int primary_height = GetSystemMetrics(SM_CYSCREEN);
+
+    out_x = static_cast<LONG>(ox * (65535.0f / primary_width));
+    out_y = static_cast<LONG>(oy * (65535.0f / primary_height));
+}
+
 bool initTouchAPI() {
     HMODULE hUser32 = GetModuleHandleA("user32.dll");
     if (!hUser32) {
@@ -322,6 +419,7 @@ namespace hardware_simulator {
 // static
 void HardwareSimulatorPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
+  CreateHiddenMessageWindow();
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "hardware_simulator",
@@ -472,15 +570,20 @@ void performMouseMoveRelative(double x,double y){
     send_input(i);
 }
 
-void performMouseMoveAbsl(double x,double y){
+void performMouseMoveAbsl(double x,double y,int screenId){
     INPUT i {};
 
     i.type = INPUT_MOUSE;
     auto &mi = i.mi;
 
+    LONG newx = 0, newy = 0;
+
+
     mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
-    mi.dx = x * 65535;
-    mi.dy = y * 65535;
+
+    adjust_to_main_screen(screenId, x,y, newx, newy);
+    mi.dx = newx;
+    mi.dy = newy;
 
     send_input(i);
 }
@@ -535,6 +638,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(version_stream.str()));
   } else if (method_call.method_name().compare("getMonitorCount") == 0) {
     int monitorCount = GetSystemMetrics(SM_CMONITORS);
+    update_monitors();
     result->Success(flutter::EncodableValue(monitorCount));
   } else if (method_call.method_name().compare("KeyPress") == 0) {
         auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
@@ -549,7 +653,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("mouseMoveA") == 0) {
         auto percentx = (args->find(flutter::EncodableValue("x")))->second;
         auto percenty = (args->find(flutter::EncodableValue("y")))->second;
-        performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
+        auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
+        performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))), static_cast<int>(std::get<int>((screenId))));
         result->Success(nullptr);
   } else if (method_call.method_name().compare("mousePress") == 0) {
         auto buttonid = (args->find(flutter::EncodableValue("buttonId")))->second;
