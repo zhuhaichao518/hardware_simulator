@@ -70,6 +70,7 @@ std::vector<MonitorInfo> g_monitors;
 
 void update_monitors() {
     g_monitors.clear();
+    //EnumDisplayDevicesW in WebRTC
     EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
         auto& list = *reinterpret_cast<std::vector<MonitorInfo>*>(data);
         MONITORINFO info{ sizeof(MONITORINFO) };
