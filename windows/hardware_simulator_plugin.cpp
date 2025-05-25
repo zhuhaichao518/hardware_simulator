@@ -141,9 +141,9 @@ HWND CreateHiddenMessageWindow() {
     return hWnd;
 }
 
-void adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
+bool adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
     auto monitors = get_monitors();
-    if (screen_index < 0 || screen_index >= monitors.size()) return;
+    if (screen_index < 0 || screen_index >= monitors.size()) return false;
 
     const auto& screen = monitors[screen_index];
     int ox, oy;
@@ -155,13 +155,14 @@ void adjust_to_main_screen(int screen_index, double x_percent, double y_percent,
 
     out_x = static_cast<LONG>(ox * (65535.0f / primary_width));
     out_y = static_cast<LONG>(oy * (65535.0f / primary_height));
+    return true;
 }
 
-void adjust_touch_to_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
+bool adjust_touch_to_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
     auto monitors = get_monitors();
     if (monitors.empty() || screen_index < 0 || screen_index >= monitors.size()) {
         out_x = out_y = 0;
-        return;
+        return false;
     }
 
     RECT global_bounds = {0};
@@ -184,6 +185,7 @@ void adjust_touch_to_screen(int screen_index, double x_percent, double y_percent
 
     out_x = static_cast<LONG>(global_x * GetSystemMetrics(SM_CXVIRTUALSCREEN));
     out_y = static_cast<LONG>(global_y * GetSystemMetrics(SM_CYVIRTUALSCREEN));
+    return true;
 }
 
 bool initTouchAPI() {
@@ -291,7 +293,7 @@ void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool 
     touchInfo.pointerInfo.pointerType = PT_TOUCH;
 
     LONG out_x, out_y;
-    adjust_touch_to_screen(screenId,x,y,out_x,out_y);
+    if (!adjust_touch_to_screen(screenId,x,y,out_x,out_y)) return;
     touchInfo.pointerInfo.ptPixelLocation.x = out_x;//static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
     touchInfo.pointerInfo.ptPixelLocation.y = out_y;//static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
 
@@ -333,7 +335,7 @@ void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
     auto& touchInfo = pointer->touchInfo;
 
     LONG out_x, out_y;
-    adjust_touch_to_screen(screenId, x, y, out_x, out_y);
+    if (!adjust_touch_to_screen(screenId, x, y, out_x, out_y)) return;
     touchInfo.pointerInfo.ptPixelLocation.x = out_x;//static_cast<LONG>(x * GetSystemMetrics(SM_CXSCREEN));
     touchInfo.pointerInfo.ptPixelLocation.y = out_y;//static_cast<LONG>(y * GetSystemMetrics(SM_CYSCREEN));
 
@@ -614,8 +616,7 @@ void performMouseMoveAbsl(double x,double y,int screenId){
 
 
     mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
-
-    adjust_to_main_screen(screenId, x,y, newx, newy);
+    if (!adjust_to_main_screen(screenId, x,y, newx, newy)) return;
     mi.dx = newx;
     mi.dy = newy;
 
