@@ -2,6 +2,7 @@ import 'dart:ui' as ui show Image, decodeImageFromPixels, PixelFormat;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
 
@@ -143,6 +144,22 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }, 1);
   }
 
+  void _registerTrackCursor() async {
+    if (Platform.isIOS) {
+      HardwareSimulator.addCursorMoved((double dx, double dy) {
+        print('Cursor moved: dx=$dx, dy=$dy');
+      });
+    }
+  }
+
+  void _unregisterTrackCursor() async {
+    if (Platform.isIOS) {
+      HardwareSimulator.removeCursorMoved((double dx, double dy) {
+        print('Cursor moved: dx=$dx, dy=$dy');
+      });
+    }
+  }
+
   void _unregisterCursorChanged() async {
     HardwareSimulator.removeCursorImageUpdated(1);
   }
@@ -155,6 +172,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     // 监听硬件键盘事件
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _textFieldFocusNode = FocusNode();
+    _registerTrackCursor(); // 注册trackCursor回调
   }
 
   @override
@@ -162,6 +180,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _textFieldFocusNode?.dispose();
     _unregisterCursorChanged();
+    _unregisterTrackCursor(); // 注销trackCursor回调
     super.dispose();
   }
 
