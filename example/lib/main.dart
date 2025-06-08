@@ -141,7 +141,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           image = cached_images[messageInfo]; // 在setState中更新image
         });
       }
-    }, 1, false);
+    }, 1, true);
   }
 
   void _registerTrackCursor() async {

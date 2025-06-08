@@ -67,22 +67,10 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
     
     mouseInput.mouseMovedHandler = { [weak self] mouse, deltaX, deltaY in
       guard let self = self else { return }
-      
-      self.accumulatedDeltaX += deltaX
-      self.accumulatedDeltaY += -deltaY
-      
-      let truncatedDeltaX = Int16(self.accumulatedDeltaX)
-      let truncatedDeltaY = Int16(self.accumulatedDeltaY)
-      
-      if truncatedDeltaX != 0 || truncatedDeltaY != 0 {
-        self.channel?.invokeMethod("onCursorMoved", arguments: [
-          "dx": truncatedDeltaX,
-          "dy": truncatedDeltaY
-        ])
-        
-        self.accumulatedDeltaX -= Float(truncatedDeltaX)
-        self.accumulatedDeltaY -= Float(truncatedDeltaY)
-      }
+      self.channel?.invokeMethod("onCursorMoved", arguments: [
+        "dx": deltaX,
+        "dy": -deltaY
+      ])
     }
     
     mouseInput.leftButton.pressedChangedHandler = { [weak self] button, value, pressed in
