@@ -19,6 +19,16 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
           callback(call.arguments['dx'], call.arguments['dy']);
         }
       }
+      if (call.method == "onCursorButton") {
+        for (var callback in cursorPressedCallbacks) {
+          callback(call.arguments['buttonId'], call.arguments['isDown']);
+        }
+      }
+      if (call.method == "onCursorScroll") {
+        for (var callback in cursorWheelCallbacks) {
+          callback(call.arguments['dx'], call.arguments['dy']);
+        }
+      }
       if (call.method == "onCursorImageMessage") {
         int callbackID = call.arguments['callbackID'];
         if (cursorImageCallbacks.containsKey(callbackID)) {
@@ -105,6 +115,32 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   @override
   void removeCursorMoved(CursorMovedCallback callback) {
     cursorMovedCallbacks.remove(callback);
+  }
+
+  final List<CursorPressedCallback> cursorPressedCallbacks = [];
+
+  @override
+  void addCursorPressed(CursorPressedCallback callback) {
+    if (!isinitialized) init();
+    cursorPressedCallbacks.add(callback);
+  }
+
+  @override
+  void removeCursorPressed(CursorPressedCallback callback) {
+    cursorPressedCallbacks.remove(callback);
+  }
+
+  final List<CursorWheelCallback> cursorWheelCallbacks = [];
+
+  @override
+  void addCursorWheel(CursorWheelCallback callback) {
+    if (!isinitialized) init();
+    cursorWheelCallbacks.add(callback);
+  }
+
+  @override
+  void removeCursorWheel(CursorWheelCallback callback) {
+    cursorWheelCallbacks.remove(callback);
   }
 
   final Map<int, CursorImageUpdatedCallback> cursorImageCallbacks = {};
@@ -219,11 +255,6 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> doControllerAction(int controllerId, String action) async {
-    /*await methodChannel.invokeMethod('doControlAction', {
-      'id': controllerId,
-      'action': action,
-    });
-*/
     await methodChannel.invokeMethod(
       'doControlAction',
       <String, dynamic>{'id': controllerId, 'action': action},
