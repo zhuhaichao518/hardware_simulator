@@ -11,6 +11,7 @@ class CursorConstants {
 public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
   private var methodChannel: FlutterMethodChannel?
   private var defaultCursorHasher: CursorHasher?
+  private var currentScreenId: Int = 0
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "hardware_simulator", binaryMessenger: registrar.messenger)
@@ -139,6 +140,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           print("Invalid screenId: \(screenId)")
           return
       }
+      currentScreenId = screenId;
 
       let targetScreen = screens[screenId]
       let screenFrame = targetScreen.frame
@@ -390,8 +392,15 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
     var int8Image:[UInt8] = [9];
     int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsWide)])
     int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsHigh)])
-    int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.x)])
-    int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.y)])
+    // 获取当前屏幕的缩放因子
+    let currentScreen = NSScreen.screens[currentScreenId]
+    var scaleFactor = currentScreen.backingScaleFactor
+    if cursorImage!.representations[0].pixelsWide <= 32 && cursorImage!.representations[0].pixelsHigh <= 32 {
+        scaleFactor = 1.0
+    }
+    // TODO: 为什么获取到的非系统自带图片的hotSpot不对？暂缓方案
+    int8Image.append(contentsOf:[0,0,0,UInt8(Int(hotSpot!.x * scaleFactor))])
+    int8Image.append(contentsOf:[0,0,0,UInt8(Int(hotSpot!.y * scaleFactor))])
     int8Image.append(UInt8((messageHash >> 24) & 0xFF))
     int8Image.append(UInt8((messageHash >> 16) & 0xFF)) 
     int8Image.append(UInt8((messageHash >> 8) & 0xFF))
@@ -604,6 +613,11 @@ class CursorHasher {
           }
           let hash = sha256ForAllBitmapReps(in: cursor.image)
           cursorHashMap[hash] = index
+          
+          // 打印每个光标的尺寸
+          if let rep = cursor.image.representations.first as? NSBitmapImageRep {
+              print("Cursor \(index) size: \(rep.pixelsWide)x\(rep.pixelsHigh)")
+          }
       }
     }
     
