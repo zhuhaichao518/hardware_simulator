@@ -275,6 +275,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
   var previousCursorImageHashes: String = ""
   var cursorChangedCallbacks = Set<Int>()
   var jsHashWithImageHash = Dictionary<String, UInt32>()
+  var hookAllCursorImage = Dictionary<Int, Bool>()
 
   func JSHash(buffer: [UInt8], size: Int) -> UInt32 {
     var hash: UInt32 = 1315423911
@@ -328,13 +329,39 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       let cursorIndex = defaultCursorHasher?.getHashMap()[cursorImageHashes]
         //print("default: \(cursorIndex!)");
         for callbackID in cursorChangedCallbacks {
-          let message: [String: Any] = [
-              "callbackID": callbackID,
-              "message": CursorConstants.cursorUpdatedDefault,
-              "msg_info": cursorIndex,
-              "cursorImage": FlutterStandardTypedData.init(bytes: Data([]))
-          ]
-          methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+            if !(hookAllCursorImage[callbackID] ?? false) {
+                let message: [String: Any] = [
+                    "callbackID": callbackID,
+                    "message": CursorConstants.cursorUpdatedDefault,
+                    "msg_info": cursorIndex,
+                    "cursorImage": FlutterStandardTypedData.init(bytes: Data([]))
+                ]
+                methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+            } else {
+                // For hookAll=true, treat it as if it's not a default cursor
+                let imagedataInt8 = getBitMapInt8(bitmapRep: cursorImage!.representations[0] as! NSBitmapImageRep)
+                let messageHash = JSHash(buffer: imagedataInt8!, size: imagedataInt8!.count)
+                jsHashWithImageHash[cursorImageHashes] = messageHash
+
+                var int8Image:[UInt8] = [9];
+                int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsWide)])
+                int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage!.representations[0].pixelsHigh)])
+                int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.x)])
+                int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot!.y)])
+                int8Image.append(UInt8((messageHash >> 24) & 0xFF))
+                int8Image.append(UInt8((messageHash >> 16) & 0xFF)) 
+                int8Image.append(UInt8((messageHash >> 8) & 0xFF))
+                int8Image.append(UInt8(messageHash & 0xFF))
+                int8Image.append(contentsOf: imagedataInt8!)
+
+                let message: [String: Any] = [
+                    "callbackID": callbackID,
+                    "message": CursorConstants.cursorUpdatedImage,
+                    "msg_info": messageHash,
+                    "cursorImage": FlutterStandardTypedData.init(bytes: Data(int8Image))
+                ]
+                methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+            }
         }
         return ;
     }
@@ -473,11 +500,13 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       result(nil)
     case "hookCursorImage":
       if let args = call.arguments as? [String: Any],
-          let callbackID = args["callbackID"] as? Int{
-          if cursorChangedCallbacks.count == 0{
+          let callbackID = args["callbackID"] as? Int,
+          let hookAll = args["hookAll"] as? Bool {
+          if cursorChangedCallbacks.count == 0 {
             mouseMovedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in  self?.checkMouseCursor() }
           }
           cursorChangedCallbacks.insert(callbackID)
+          hookAllCursorImage[callbackID] = hookAll
          }
       else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for hookCursorImage", details: nil))
@@ -486,6 +515,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       if let args = call.arguments as? [String: Any],
         let callbackID = args["callbackID"] as? Int{
           cursorChangedCallbacks.remove(callbackID)
+          hookAllCursorImage.removeValue(forKey: callbackID)
           if cursorChangedCallbacks.count == 0{
               if let monitor = mouseMovedMonitor {
                NSEvent.removeMonitor(monitor)
