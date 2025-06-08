@@ -2,121 +2,167 @@ import Flutter
 import UIKit
 import GameController
 
-public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
-  private var channel: FlutterMethodChannel?
-  private var mouseConnectObserver: NSObjectProtocol?
-  private var mouseDisconnectObserver: NSObjectProtocol?
-  private var accumulatedDeltaX: Float = 0
-  private var accumulatedDeltaY: Float = 0
-  
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "hardware_simulator", binaryMessenger: registrar.messenger())
-    let instance = HardwareSimulatorPlugin()
-    instance.channel = channel
-    registrar.addMethodCallDelegate(instance, channel: channel)
+@available(iOS 13.4, *)
+extension UIView {
+    func hidePointer() {
+        let interaction = UIPointerInteraction(delegate: self)
+        addInteraction(interaction)
+    }
     
-    instance.startTrackingMouse()
-  }
+    func unhidePointer() {
+        for interaction in interactions {
+            if let pointerInteraction = interaction as? UIPointerInteraction {
+                removeInteraction(pointerInteraction)
+            }
+        }
+    }
+}
 
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "getPlatformVersion":
-      result("iOS " + UIDevice.current.systemVersion)
-    case "addCursorMoved":
-      result(nil)
-    case "addCursorButton":
-      result(nil)
-    case "addCursorScroll":
-      result(nil)
-    default:
-      result(FlutterMethodNotImplemented)
+@available(iOS 13.4, *)
+extension UIView: UIPointerInteractionDelegate {
+    public func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest, defaultRegion: UIPointerRegion) -> UIPointerRegion? {
+        return nil//UIPointerRegion(rect: bounds)
     }
-  }
-  
-  private func startTrackingMouse() {
-    if #available(iOS 14.0, *) {
-      mouseConnectObserver = NotificationCenter.default.addObserver(
-        forName: .GCMouseDidConnect,
-        object: nil,
-        queue: .main
-      ) { [weak self] notification in
-        if let mouse = notification.object as? GCMouse {
-          self?.registerMouseCallbacks(mouse)
+    
+    public func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
+        return UIPointerStyle.hidden()
+    }
+}
+
+public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
+    private var channel: FlutterMethodChannel?
+    private var mouseConnectObserver: NSObjectProtocol?
+    private var mouseDisconnectObserver: NSObjectProtocol?
+    private var accumulatedDeltaX: Float = 0
+    private var accumulatedDeltaY: Float = 0
+    
+    public static func register(with registrar: FlutterPluginRegistrar) {
+        let channel = FlutterMethodChannel(name: "hardware_simulator", binaryMessenger: registrar.messenger())
+        let instance = HardwareSimulatorPlugin()
+        instance.channel = channel
+        registrar.addMethodCallDelegate(instance, channel: channel)
+        
+        instance.startTrackingMouse()
+    }
+
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
+        case "getPlatformVersion":
+            result("iOS " + UIDevice.current.systemVersion)
+        case "addCursorMoved":
+            result(nil)
+        case "addCursorButton":
+            result(nil)
+        case "addCursorScroll":
+            result(nil)
+        case "lockCursor":
+            if #available(iOS 11.0, *) {
+                if let window = UIApplication.shared.windows.first {
+                    if #available(iOS 13.4, *) {
+                        window.rootViewController?.view.hidePointer()
+                    }
+                }
+            }
+            result(nil)
+        case "unlockCursor":
+            if #available(iOS 11.0, *) {
+                if let window = UIApplication.shared.windows.first {
+                    if #available(iOS 13.4, *) {
+                        window.rootViewController?.view.unhidePointer()
+                    }
+                }
+            }
+            result(nil)
+        default:
+            result(FlutterMethodNotImplemented)
         }
-      }
-      
-      mouseDisconnectObserver = NotificationCenter.default.addObserver(
-        forName: .GCMouseDidDisconnect,
-        object: nil,
-        queue: .main
-      ) { [weak self] notification in
-        if let mouse = notification.object as? GCMouse {
-          self?.unregisterMouseCallbacks(mouse)
+    }
+    
+    private func startTrackingMouse() {
+        if #available(iOS 14.0, *) {
+            mouseConnectObserver = NotificationCenter.default.addObserver(
+                forName: .GCMouseDidConnect,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                if let mouse = notification.object as? GCMouse {
+                    self?.registerMouseCallbacks(mouse)
+                }
+            }
+            
+            mouseDisconnectObserver = NotificationCenter.default.addObserver(
+                forName: .GCMouseDidDisconnect,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                if let mouse = notification.object as? GCMouse {
+                    self?.unregisterMouseCallbacks(mouse)
+                }
+            }
+            
+            for mouse in GCMouse.mice() {
+                registerMouseCallbacks(mouse)
+            }
         }
-      }
-      
-      for mouse in GCMouse.mice() {
-        registerMouseCallbacks(mouse)
-      }
-    }
-  }
-  
-  @available(iOS 14.0, *)
-  private func registerMouseCallbacks(_ mouse: GCMouse) {
-    guard let mouseInput = mouse.mouseInput else { return }
-    
-    mouseInput.mouseMovedHandler = { [weak self] mouse, deltaX, deltaY in
-      guard let self = self else { return }
-      self.channel?.invokeMethod("onCursorMoved", arguments: [
-        "dx": deltaX,
-        "dy": -deltaY
-      ])
     }
     
-    mouseInput.leftButton.pressedChangedHandler = { [weak self] button, value, pressed in
-      self?.channel?.invokeMethod("onCursorButton", arguments: [
-        "buttonId": 1,  // 左键
-        "isDown": pressed
-      ])
+    @available(iOS 14.0, *)
+    private func registerMouseCallbacks(_ mouse: GCMouse) {
+        guard let mouseInput = mouse.mouseInput else { return }
+        
+        mouseInput.mouseMovedHandler = { [weak self] mouse, deltaX, deltaY in
+            guard let self = self else { return }
+            self.channel?.invokeMethod("onCursorMoved", arguments: [
+                "dx": deltaX,
+                "dy": -deltaY
+            ])
+            return
+        }
+        
+        mouseInput.leftButton.pressedChangedHandler = { [weak self] button, value, pressed in
+            self?.channel?.invokeMethod("onCursorButton", arguments: [
+                "buttonId": 1,  // 左键
+                "isDown": pressed
+            ])
+        }
+        
+        mouseInput.middleButton?.pressedChangedHandler = { [weak self] button, value, pressed in
+            self?.channel?.invokeMethod("onCursorButton", arguments: [
+                "buttonId": 2,  // 中键
+                "isDown": pressed
+            ])
+        }
+        
+        mouseInput.rightButton?.pressedChangedHandler = { [weak self] button, value, pressed in
+            self?.channel?.invokeMethod("onCursorButton", arguments: [
+                "buttonId": 3,  // 右键
+                "isDown": pressed
+            ])
+        }
+        
+        mouseInput.scroll.yAxis.valueChangedHandler = { [weak self] axis, value in
+            self?.channel?.invokeMethod("onCursorScroll", arguments: [
+                "dx": 0,
+                "dy": Double(value)
+            ])
+        }
+        
+        mouseInput.scroll.xAxis.valueChangedHandler = { [weak self] axis, value in
+            self?.channel?.invokeMethod("onCursorScroll", arguments: [
+                "dx": Double(value),
+                "dy": 0
+            ])
+        }
     }
     
-    mouseInput.middleButton?.pressedChangedHandler = { [weak self] button, value, pressed in
-      self?.channel?.invokeMethod("onCursorButton", arguments: [
-        "buttonId": 2,  // 中键
-        "isDown": pressed
-      ])
+    @available(iOS 14.0, *)
+    private func unregisterMouseCallbacks(_ mouse: GCMouse) {
+        guard let mouseInput = mouse.mouseInput else { return }
+        mouseInput.mouseMovedHandler = nil
+        mouseInput.leftButton.pressedChangedHandler = nil
+        mouseInput.middleButton?.pressedChangedHandler = nil
+        mouseInput.rightButton?.pressedChangedHandler = nil
+        mouseInput.scroll.yAxis.valueChangedHandler = nil
+        mouseInput.scroll.xAxis.valueChangedHandler = nil
     }
-    
-    mouseInput.rightButton?.pressedChangedHandler = { [weak self] button, value, pressed in
-      self?.channel?.invokeMethod("onCursorButton", arguments: [
-        "buttonId": 3,  // 右键
-        "isDown": pressed
-      ])
-    }
-    
-    mouseInput.scroll.yAxis.valueChangedHandler = { [weak self] axis, value in
-      self?.channel?.invokeMethod("onCursorScroll", arguments: [
-        "dx": 0,
-        "dy": Double(value)
-      ])
-    }
-    
-    mouseInput.scroll.xAxis.valueChangedHandler = { [weak self] axis, value in
-      self?.channel?.invokeMethod("onCursorScroll", arguments: [
-        "dx": Double(value),
-        "dy": 0
-      ])
-    }
-  }
-  
-  @available(iOS 14.0, *)
-  private func unregisterMouseCallbacks(_ mouse: GCMouse) {
-    guard let mouseInput = mouse.mouseInput else { return }
-    mouseInput.mouseMovedHandler = nil
-    mouseInput.leftButton.pressedChangedHandler = nil
-    mouseInput.middleButton?.pressedChangedHandler = nil
-    mouseInput.rightButton?.pressedChangedHandler = nil
-    mouseInput.scroll.yAxis.valueChangedHandler = nil
-    mouseInput.scroll.xAxis.valueChangedHandler = nil
-  }
 }
