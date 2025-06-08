@@ -10,6 +10,10 @@ extension UIViewController {
     
     static func swizzlePrefersPointerLocked() {
         if #available(iOS 14.0, *) {
+            if swizzled {
+                return
+            }
+
             let originalSelector = #selector(getter: UIViewController.prefersPointerLocked)
             let swizzledSelector = #selector(UIViewController.swizzled_prefersPointerLocked)
             
@@ -19,14 +23,15 @@ extension UIViewController {
             }
             
             // 如果已经 swizzled，先恢复原始实现
-            if swizzled {
+            /*if swizzled {
                 if let originalIMP = originalPrefersPointerLockedIMP {
                     method_setImplementation(originalMethod, originalIMP)
                 }
             } else {
                 // 保存原始方法的实现
                 originalPrefersPointerLockedIMP = method_getImplementation(originalMethod)
-            }
+            }*/
+            originalPrefersPointerLockedIMP = method_getImplementation(originalMethod)
             
             // 设置新的实现
             method_setImplementation(originalMethod, method_getImplementation(swizzledMethod))
@@ -35,6 +40,9 @@ extension UIViewController {
     }
     
     static func unswizzlePrefersPointerLocked() {
+        if !swizzled {
+            return
+        }
         guard swizzled, let originalIMP = originalPrefersPointerLockedIMP else { return }
         
         if #available(iOS 14.0, *) {
