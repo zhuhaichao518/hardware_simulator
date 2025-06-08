@@ -479,6 +479,22 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
     callbacks[callback_id] = callback;
     hookAllCursorImage[callback_id] = hookAll;
     cachedcursors[callback_id] = {};
+
+    // If hookAll is true, trigger an immediate callback
+    if (hookAll) {
+        CURSORINFO ci = { sizeof(ci) };
+        GetCursorInfo(&ci);
+        HDC hdc = GetDC(nullptr);
+        int width = 0, height = 0, hotX = 0, hotY = 0;
+        std::unique_ptr<uint32_t[]> image = std::move(
+            CreateMouseCursorFromHCursor(hdc, ci.hCursor, &width, &height, &hotX, &hotY));
+        ReleaseDC(nullptr, hdc);
+
+        unsigned int hash = JSHash(image.get(), width * height);
+        std::vector<uint8_t> datawith8bitbytes = ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
+        cachedcursors[callback_id].insert(hash);
+        callback(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
+    }
 }
 
 void CursorMonitor::endHook(long long callback_id) {

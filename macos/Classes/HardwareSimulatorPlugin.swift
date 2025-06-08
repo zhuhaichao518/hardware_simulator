@@ -507,6 +507,37 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
           }
           cursorChangedCallbacks.insert(callbackID)
           hookAllCursorImage[callbackID] = hookAll
+
+          // If hookAll is true, trigger an immediate callback
+          if hookAll {
+              let currentCursor = NSCursor.currentSystem
+              if let cursorImage = currentCursor?.image,
+                 let hotSpot = currentCursor?.hotSpot {
+                  let cursorImageHashes = sha256ForAllBitmapReps(in: cursorImage)
+                  let imagedataInt8 = getBitMapInt8(bitmapRep: cursorImage.representations[0] as! NSBitmapImageRep)
+                  let messageHash = JSHash(buffer: imagedataInt8!, size: imagedataInt8!.count)
+                  jsHashWithImageHash[cursorImageHashes] = messageHash
+
+                  var int8Image:[UInt8] = [9]
+                  int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage.representations[0].pixelsWide)])
+                  int8Image.append(contentsOf:[0,0,0,UInt8(cursorImage.representations[0].pixelsHigh)])
+                  int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot.x)])
+                  int8Image.append(contentsOf:[0,0,0,UInt8(hotSpot.y)])
+                  int8Image.append(UInt8((messageHash >> 24) & 0xFF))
+                  int8Image.append(UInt8((messageHash >> 16) & 0xFF)) 
+                  int8Image.append(UInt8((messageHash >> 8) & 0xFF))
+                  int8Image.append(UInt8(messageHash & 0xFF))
+                  int8Image.append(contentsOf: imagedataInt8!)
+
+                  let message: [String: Any] = [
+                      "callbackID": callbackID,
+                      "message": CursorConstants.cursorUpdatedImage,
+                      "msg_info": messageHash,
+                      "cursorImage": FlutterStandardTypedData.init(bytes: Data(int8Image))
+                  ]
+                  methodChannel?.invokeMethod("onCursorImageMessage", arguments: message)
+              }
+          }
          }
       else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for hookCursorImage", details: nil))
