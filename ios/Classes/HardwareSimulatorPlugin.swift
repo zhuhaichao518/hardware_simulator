@@ -1,6 +1,73 @@
 import Flutter
 import UIKit
 import GameController
+import ObjectiveC
+
+@available(iOS 13.4, *)
+extension UIViewController {
+    private static var swizzled = false
+    private static var originalPrefersPointerLockedIMP: IMP?
+    
+    static func swizzlePrefersPointerLocked() {
+        if #available(iOS 14.0, *) {
+            let originalSelector = #selector(getter: UIViewController.prefersPointerLocked)
+            let swizzledSelector = #selector(UIViewController.swizzled_prefersPointerLocked)
+            
+            guard let originalMethod = class_getInstanceMethod(UIViewController.self, originalSelector),
+                  let swizzledMethod = class_getInstanceMethod(UIViewController.self, swizzledSelector) else {
+                return
+            }
+            
+            // 如果已经 swizzled，先恢复原始实现
+            if swizzled {
+                if let originalIMP = originalPrefersPointerLockedIMP {
+                    method_setImplementation(originalMethod, originalIMP)
+                }
+            } else {
+                // 保存原始方法的实现
+                originalPrefersPointerLockedIMP = method_getImplementation(originalMethod)
+            }
+            
+            // 设置新的实现
+            method_setImplementation(originalMethod, method_getImplementation(swizzledMethod))
+            swizzled = true
+        }
+    }
+    
+    static func unswizzlePrefersPointerLocked() {
+        guard swizzled, let originalIMP = originalPrefersPointerLockedIMP else { return }
+        
+        if #available(iOS 14.0, *) {
+            let originalSelector = #selector(getter: UIViewController.prefersPointerLocked)
+            
+            guard let originalMethod = class_getInstanceMethod(UIViewController.self, originalSelector) else {
+                return
+            }
+            
+            // 直接设置回原始实现
+            method_setImplementation(originalMethod, originalIMP)
+            swizzled = false
+        }
+    }
+    
+    @available(iOS 14.0, *)
+    @objc func swizzled_prefersPointerLocked() -> Bool {
+        print("swizzled_prefersPointerLocked called")
+        return !GCMouse.mice().isEmpty
+    }
+    
+    /*func disableSystemGestures() {
+        if #available(iOS 11.0, *) {
+            self.modalPresentationStyle = .fullScreen
+            self.edgesForExtendedLayout = []
+            self.setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+        }
+    }*/
+    
+    /*override open func preferredScreenEdgesDeferringSystemGestures() -> UIRectEdge {
+        return .all
+    }*/
+}
 
 @available(iOS 13.4, *)
 extension UIView {
@@ -21,7 +88,7 @@ extension UIView {
 @available(iOS 13.4, *)
 extension UIView: UIPointerInteractionDelegate {
     public func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest, defaultRegion: UIPointerRegion) -> UIPointerRegion? {
-        return nil//UIPointerRegion(rect: bounds)
+        return nil; //UIPointerRegion(rect: bounds)
     }
     
     public func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
@@ -61,6 +128,10 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
                     if #available(iOS 13.4, *) {
                         window.rootViewController?.view.hidePointer()
                     }
+                    if #available(iOS 14.0, *) {
+                        UIViewController.swizzlePrefersPointerLocked()
+                        window.rootViewController?.setNeedsUpdateOfPrefersPointerLocked()
+                    }
                 }
             }
             result(nil)
@@ -69,6 +140,10 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
                 if let window = UIApplication.shared.windows.first {
                     if #available(iOS 13.4, *) {
                         window.rootViewController?.view.unhidePointer()
+                    }
+                    if #available(iOS 14.0, *) {
+                        UIViewController.unswizzlePrefersPointerLocked()
+                        window.rootViewController?.setNeedsUpdateOfPrefersPointerLocked()
                     }
                 }
             }

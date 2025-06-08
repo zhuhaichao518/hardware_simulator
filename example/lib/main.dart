@@ -7,19 +7,24 @@ import 'dart:io';
 import 'package:hardware_simulator/hardware_simulator.dart';
 
 import 'package:url_launcher/url_launcher.dart';
+import 'fps_game_example.dart';
 
 void main() {
-  runApp(MyApp());
+  //SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: Text('Hardware Simulator')),
-        body: SimulatorScreen(),
+      title: 'FPS Game Example',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
       ),
+      home: const FPSGameExample(),
     );
   }
 }
