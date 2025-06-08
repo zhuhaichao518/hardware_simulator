@@ -710,6 +710,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         result->Success(nullptr);
   } else if (method_call.method_name().compare("hookCursorImage") == 0) {
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        auto hookAll = static_cast<bool>(std::get<bool>((args->find(flutter::EncodableValue("hookAll")))->second));
         CursorMonitor::startHook([this, callbackID](int message, int msg_info, const std::vector<uint8_t>& cursorImage) {
             flutter::EncodableMap encoded_message;
             encoded_message[flutter::EncodableValue("callbackID")] = flutter::EncodableValue(callbackID);
@@ -720,7 +721,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
                 channel_->InvokeMethod("onCursorImageMessage", 
                     std::make_unique<flutter::EncodableValue>(encoded_message));
             }
-        }, callbackID);
+        }, callbackID, hookAll);
         result->Success(nullptr);
   } else if (method_call.method_name().compare("unhookCursorImage") == 0) {
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));

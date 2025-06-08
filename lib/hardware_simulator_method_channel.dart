@@ -111,7 +111,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   void addCursorImageUpdated(
-      CursorImageUpdatedCallback callback, int callbackId) {
+      CursorImageUpdatedCallback callback, int callbackId, bool hookAll) {
     if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
       return;
     }
@@ -119,6 +119,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     cursorImageCallbacks[callbackId] = callback;
     methodChannel.invokeMethod('hookCursorImage', {
       'callbackID': callbackId,
+      'hookAll': hookAll,
     });
   }
 

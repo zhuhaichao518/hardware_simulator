@@ -92,7 +92,7 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   void addCursorImageUpdated(
-      CursorImageUpdatedCallback callback, int callbackId) {
+      CursorImageUpdatedCallback callback, int callbackId, bool hookAll) {
     throw UnimplementedError(
         'addCursorImageUpdated() has not been implemented.');
   }

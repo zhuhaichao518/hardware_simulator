@@ -131,11 +131,12 @@ class HardwareSimulator {
   static const int CURSOR_UPDATED_IMAGE = 4;
   // ignore: constant_identifier_names
   static const int CURSOR_UPDATED_CACHED = 5;
-
+  
+  // hook_all means we stream cursor image including standard system cursor.
   static void addCursorImageUpdated(
-      CursorImageUpdatedCallback callback, int callbackId) {
+      CursorImageUpdatedCallback callback, int callbackId, bool hookAll) {
     HardwareSimulatorPlatform.instance
-        .addCursorImageUpdated(callback, callbackId);
+        .addCursorImageUpdated(callback, callbackId, hookAll);
   }
 
   static void removeCursorImageUpdated(int callbackId) {
