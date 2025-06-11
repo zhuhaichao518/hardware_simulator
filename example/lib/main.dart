@@ -20,11 +20,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FPS Game Example',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+      home: Scaffold(
+        appBar: AppBar(title: Text('Hardware Simulator')),
+        body: SimulatorScreen(),
       ),
-      home: const FPSGameExample(),
     );
   }
 }
@@ -175,14 +174,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   void initState() {
     super.initState();
     // 监听硬件键盘事件
-    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    //HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _textFieldFocusNode = FocusNode();
     _registerTrackCursor(); // 注册trackCursor回调
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    //HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _textFieldFocusNode?.dispose();
     _unregisterCursorChanged();
     _unregisterTrackCursor(); // 注销trackCursor回调
@@ -256,11 +255,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             Expanded(
                 child: TextField(
                     controller: xController,
-                    decoration: InputDecoration(labelText: 'X (% from left)'))),
+                    decoration: InputDecoration(labelText: 'X(0 - 1.0) (% from left)'))),
             Expanded(
                 child: TextField(
                     controller: yController,
-                    decoration: InputDecoration(labelText: 'Y (% from top)'))),
+                    decoration: InputDecoration(labelText: 'Y(0 - 1.0) (% from top)'))),
             ElevatedButton(
                 onPressed: _moveMouseAbsolute,
                 child: Text('Move Mouse to X, Y')),
