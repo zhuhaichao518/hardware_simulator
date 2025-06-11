@@ -31,6 +31,12 @@ typedef HSYNTHETICPOINTERDEVICE(WINAPI* PFN_CreateSyntheticPointerDevice)(POINTE
 typedef BOOL(WINAPI* PFN_InjectSyntheticPointerInput)(HSYNTHETICPOINTERDEVICE device, CONST POINTER_TYPE_INFO* pointerInfo, UINT32 count);
 typedef VOID(WINAPI* PFN_DestroySyntheticPointerDevice)(HSYNTHETICPOINTERDEVICE device);
 
+namespace hardware_simulator {
+
+// Function declarations
+void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat);
+void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown, bool isRepeat);
+
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 PFN_CreateSyntheticPointerDevice fnCreateSyntheticPointerDevice = nullptr;
 PFN_InjectSyntheticPointerInput fnInjectSyntheticPointerInput = nullptr;
@@ -39,6 +45,99 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
+
+// auto repeat feature
+struct KeyState {
+    bool isDown = false;
+    std::chrono::steady_clock::time_point lastEventTime;
+};
+
+struct TouchState {
+    bool isDown = false;
+    double x = 0;
+    double y = 0;
+    int screenId = 0;
+    std::chrono::steady_clock::time_point lastEventTime;
+};
+
+static bool g_auto_repeat_enabled = true;
+static std::atomic<bool> g_thread_running{false};
+static std::mutex g_event_mutex;
+static std::unordered_map<uint16_t, KeyState> g_key_states;
+static uint16_t g_last_known_key_down = 0;
+static std::unordered_map<uint32_t, TouchState> g_touch_states;
+
+static void EventMonitorThread() {
+    while (g_thread_running) {
+        if (g_auto_repeat_enabled) {
+            auto now = std::chrono::steady_clock::now();
+            
+            {
+                std::lock_guard<std::mutex> lock(g_event_mutex);
+                
+                // Check key states
+                if (g_key_states.find(g_last_known_key_down) != g_key_states.end()) {
+                    if (g_key_states[g_last_known_key_down].isDown) {
+                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now - g_key_states[g_last_known_key_down].lastEventTime).count();
+                        if (duration >= 500) {  // 500ms repeat interval for keys
+                            performKeyEvent(g_last_known_key_down, true, true);
+                        }
+                    }
+                }
+                
+                // Check touch states
+                for (auto& [id, state] : g_touch_states) {
+                    if (state.isDown) {
+                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now - state.lastEventTime).count();
+                        if (duration >= 300) {  // 300ms repeat interval for touch
+                            performTouchEvent(state.screenId, state.x, state.y, id, true, true);
+                            state.lastEventTime = now;
+                        }
+                    }
+                }
+            }
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+void HardwareSimulatorPlugin::StopMonitorThread() {
+    if (g_thread_running) {
+        g_thread_running = false;
+        if (monitor_thread_ && monitor_thread_->joinable()) {
+            monitor_thread_->join();
+        }
+        monitor_thread_.reset();
+    }
+}
+
+void HardwareSimulatorPlugin::StartMonitorThread() {
+    if (!g_thread_running) {
+        g_thread_running = true;
+        monitor_thread_ = std::make_unique<std::thread>(EventMonitorThread);
+    }
+}
+
+void SetAutoRepeatEnabled(bool enabled) {
+    if (g_auto_repeat_enabled == enabled) {
+        return;  // No change needed
+    }
+
+    g_auto_repeat_enabled = enabled;
+    
+    // Note: Since this is a global function, we can't access the plugin instance directly.
+    // The auto-repeat state will be handled when the thread is next started/stopped.
+    if (!enabled) {
+        // Clear any existing states
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+        g_key_states.clear();
+        g_touch_states.clear();
+    }
+}
+// end of auto repeat feature
 
 //Todo:OpenInputDesktop should fail because we have a window resource in this process.
 //We need to create another process to handle this scenario.
@@ -258,7 +357,7 @@ void send_touch_input() {
     }
 }
 
-void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown) {
+void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown, bool isRepeat = false) {
     if (!g_touchDevice) {
         if (!createTouchDevice()) {
             return;
@@ -313,6 +412,16 @@ void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool 
     touchInfo.pressure = 1024;
 
     send_touch_input();
+
+    // Add state tracking
+    if (g_auto_repeat_enabled && !isRepeat) {
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+        if (isDown) {
+            g_touch_states[touchId] = {true, x, y, screenId, std::chrono::steady_clock::now()};
+        } else if (g_touch_states.find(touchId) != g_touch_states.end()) {
+            g_touch_states.erase(touchId);
+        }
+    }
 }
 
 void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
@@ -345,6 +454,14 @@ void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
     touchInfo.rcContact.right = touchInfo.pointerInfo.ptPixelLocation.x + 10;
     touchInfo.rcContact.top = touchInfo.pointerInfo.ptPixelLocation.y - 10;
     touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
+
+    if (g_auto_repeat_enabled) {
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+        if (g_touch_states.find(touchId) != g_touch_states.end()) {
+            //update the position
+            g_touch_states[touchId] = { true, x, y, screenId, std::chrono::steady_clock::now() };
+        }
+    }
 
     send_touch_input();
 }
@@ -450,8 +567,6 @@ bool RunBatchAsAdmin(
     return true;
 }
 
-namespace hardware_simulator {
-
 // static
 void HardwareSimulatorPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
@@ -462,13 +577,19 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
           &flutter::StandardMethodCodec::GetInstance());
 
   auto plugin = std::make_unique<HardwareSimulatorPlugin>();
+  auto plugin_pointer = plugin.get();
 
   plugin->channel_ = std::move(channel);
 
   plugin->channel_->SetMethodCallHandler(
-      [plugin_pointer = plugin.get()](const auto &call, auto result) {
+      [plugin_pointer](const auto &call, auto result) {
         plugin_pointer->HandleMethodCall(call, std::move(result));
       });
+
+  // Start the monitor thread if auto-repeat is enabled
+  if (g_auto_repeat_enabled) {
+      plugin_pointer->StartMonitorThread();
+  }
 
   registrar->AddPlugin(std::move(plugin));
 }
@@ -476,10 +597,9 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
 HardwareSimulatorPlugin::HardwareSimulatorPlugin() {}
 
 HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
+    StopMonitorThread();
     destroyTouchDevice();
 }
-
-thread_local HDESK _lastKnownInputDesktop = nullptr;
 
 void async_send_input_retry(INPUT& i) {
     while (true) {
@@ -551,7 +671,7 @@ void performMouseButton(int button, bool release) {
 
 #pragma warning(disable:4244)
 
-void performKeyEvent(uint16_t modcode, bool isDown) {
+void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat = false) {
     INPUT i{};
     i.type = INPUT_KEYBOARD;
     auto& ki = i.ki;
@@ -591,6 +711,17 @@ void performKeyEvent(uint16_t modcode, bool isDown) {
     }
 
     send_input(i);
+
+    // Add state tracking
+    if (g_auto_repeat_enabled && !isRepeat) {
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+        if (isDown) {
+            g_key_states[modcode] = {true, std::chrono::steady_clock::now()};
+            g_last_known_key_down = modcode;
+        } else if (g_key_states.find(modcode) != g_key_states.end()) {
+            g_key_states.erase(modcode);
+        }
+    }
 }
 
 void performMouseMoveRelative(double x,double y){

@@ -13,6 +13,6 @@ using CursorChangedCallback = std::function<void(int, int, const std::vector<uin
 class CursorMonitor {
 public:
     static HWINEVENTHOOK Global_HOOK;
-    static void startHook(CursorChangedCallback callback, long long callback_id);
+    static void startHook(CursorChangedCallback callback, long long callback_id, bool hookAll);
     static void endHook(long long callback_id);
 };
