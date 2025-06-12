@@ -248,6 +248,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // 添加导航按钮到FPS游戏示例页面
+        ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => FPSGameExample()),
+            );
+          },
+          child: Text('进入FPS游戏示例'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            textStyle: TextStyle(fontSize: 18),
+          ),
+        ),
+        SizedBox(height: 20),
         // First Row: Absolute Mouse Move
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
