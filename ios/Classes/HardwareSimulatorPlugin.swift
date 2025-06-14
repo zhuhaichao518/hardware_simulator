@@ -9,7 +9,7 @@ class HomeIndicatorAwareFlutterViewController : FlutterViewController {
 
   @available(iOS 11.0, *)
   override var prefersHomeIndicatorAutoHidden: Bool {
-    return HomeIndicatorAwareFlutterViewController.hidingHomeIndicator
+    return !HomeIndicatorAwareFlutterViewController.hidingHomeIndicator
   }
 
     
@@ -60,6 +60,42 @@ class HomeIndicatorAwareFlutterViewController : FlutterViewController {
         // Fallback on earlier versions: do nothing
       }
     }
+  }
+
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if #available(iOS 13.4, *) {
+      if let touch = touches.first, touch.type == .indirectPointer, HomeIndicatorAwareFlutterViewController.lockCursor {
+        return
+      }
+    }
+    super.touchesBegan(touches, with: event)
+  }
+  
+  override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if #available(iOS 13.4, *) {
+      if let touch = touches.first, touch.type == .indirectPointer, HomeIndicatorAwareFlutterViewController.lockCursor {
+        return
+      }
+    }
+    super.touchesMoved(touches, with: event)
+  }
+  
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if #available(iOS 13.4, *) {
+      if let touch = touches.first, touch.type == .indirectPointer, HomeIndicatorAwareFlutterViewController.lockCursor {
+        return
+      }
+    }
+    super.touchesEnded(touches, with: event)
+  }
+  
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if #available(iOS 13.4, *) {
+      if let touch = touches.first, touch.type == .indirectPointer, HomeIndicatorAwareFlutterViewController.lockCursor {
+        return
+      }
+    }
+    super.touchesCancelled(touches, with: event)
   }
 }
 
