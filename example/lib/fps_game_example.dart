@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hardware_simulator/hardware_simulator.dart';
+import 'package:hardware_simulator/hardware_simulator_platform_interface.dart';
 
 class FPSGameExample extends StatefulWidget {
   const FPSGameExample({Key? key}) : super(key: key);
@@ -14,11 +15,21 @@ class _FPSGameExampleState extends State<FPSGameExample> {
   double _cameraX = 0.0;
   double _cameraY = 0.0;
 
+  void cursorMovedCallback(deltax, deltay) {
+    if (_isCursorLocked) {
+      setState(() {
+        _cameraX += deltax * 0.1;
+        _cameraY += deltay * 0.1;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     // 初始化硬件模拟器
     HardwareSimulator.registerService();
+    HardwareSimulator.addCursorMoved(cursorMovedCallback);
   }
 
   @override
@@ -43,12 +54,12 @@ class _FPSGameExampleState extends State<FPSGameExample> {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (_isCursorLocked) {
+    /*if (_isCursorLocked) {
       setState(() {
         _cameraX += event.delta.dx * 0.1;
         _cameraY += event.delta.dy * 0.1;
       });
-    }
+    }*/
   }
 
   @override
