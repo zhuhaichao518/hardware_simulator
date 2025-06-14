@@ -1,10 +1,12 @@
 package com.cloudplayplus.hardware_simulator
 
 import android.app.Activity
+import android.os.Build
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.NonNull
+import androidx.annotation.RequiresApi
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -22,6 +24,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
   private var activity: Activity? = null
   private var isCursorLocked = false
+  private var flutterView: View? = null
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "hardware_simulator")
@@ -58,21 +61,22 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private fun lockCursor() {
-    activity?.let { act ->
-      act.window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-        or View.SYSTEM_UI_FLAG_FULLSCREEN
-        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
-      isCursorLocked = true
+    flutterView?.let { view ->
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        view.isFocusable = true
+        view.requestFocus()
+        view.requestPointerCapture()
+        isCursorLocked = true
+      }
     }
   }
 
   private fun unlockCursor() {
-    activity?.let { act ->
-      act.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-      isCursorLocked = false
+    flutterView?.let { view ->
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        view.releasePointerCapture()
+        isCursorLocked = false
+      }
     }
   }
 
@@ -80,58 +84,62 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     channel.setMethodCallHandler(null)
   }
 
+  @RequiresApi(Build.VERSION_CODES.O)
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
-    binding.activity.window.decorView.setOnGenericMotionListener { _, event ->
-      if (event.source and InputDevice.SOURCE_MOUSE == InputDevice.SOURCE_MOUSE) {
-        when (event.action) {
-          MotionEvent.ACTION_HOVER_MOVE -> {
-            channel.invokeMethod("onCursorMoved", mapOf(
-              "dx" to event.x,
-              "dy" to event.y
-            ))
-            true
-          }
-          MotionEvent.ACTION_BUTTON_PRESS -> {
-            channel.invokeMethod("onCursorButton", mapOf(
-              "buttonId" to event.buttonState,
-              "isDown" to true
-            ))
-            true
-          }
-          MotionEvent.ACTION_BUTTON_RELEASE -> {
-            channel.invokeMethod("onCursorButton", mapOf(
-              "buttonId" to event.buttonState,
-              "isDown" to false
-            ))
-            true
-          }
-          MotionEvent.ACTION_SCROLL -> {
-            val scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-            val scrollX = event.getAxisValue(MotionEvent.AXIS_HSCROLL)
-            channel.invokeMethod("onCursorScroll", mapOf(
-              "dx" to scrollX,
-              "dy" to scrollY
-            ))
-            true
-          }
-          else -> false
+    
+    // 获取Flutter的根视图
+    flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
+    
+    // 设置视图可聚焦
+    flutterView?.isFocusable = true
+    flutterView?.isFocusableInTouchMode = true
+    
+    // 设置捕获指针监听器
+    flutterView?.setOnCapturedPointerListener { _, event ->
+      when (event.source) {
+        InputDevice.SOURCE_MOUSE_RELATIVE -> {
+          // 处理鼠标相对移动
+          channel.invokeMethod("onCursorMoved", mapOf(
+            "dx" to event.x,
+            "dy" to event.y
+          ))
+          true
         }
-      } else {
-        false
+        InputDevice.SOURCE_TOUCHPAD -> {
+          // 处理触控板事件
+          val relativeX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
+          val relativeY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
+          channel.invokeMethod("onCursorMoved", mapOf(
+            "dx" to relativeX,
+            "dy" to relativeY
+          ))
+          true
+        }
+        else -> false
+      }
+    }
+
+    // 监听窗口焦点变化
+    binding.activity.window.decorView.setOnFocusChangeListener { _, hasFocus ->
+      if (hasFocus && isCursorLocked) {
+        flutterView?.requestPointerCapture()
       }
     }
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
     activity = null
+    flutterView = null
   }
 
   override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
     activity = binding.activity
+    flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
   }
 
   override fun onDetachedFromActivity() {
     activity = null
+    flutterView = null
   }
 }
