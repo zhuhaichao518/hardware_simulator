@@ -24,12 +24,20 @@ class _FPSGameExampleState extends State<FPSGameExample> {
     }
   }
 
+  void cursorPressedCallback(button, isDown) {
+    if (_isCursorLocked) {
+      print(button);
+      print(isDown);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     // 初始化硬件模拟器
     HardwareSimulator.registerService();
     HardwareSimulator.addCursorMoved(cursorMovedCallback);
+    HardwareSimulator.addCursorPressed(cursorPressedCallback);
   }
 
   @override

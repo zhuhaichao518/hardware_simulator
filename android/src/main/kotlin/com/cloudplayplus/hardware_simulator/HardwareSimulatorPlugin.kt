@@ -62,7 +62,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   private fun lockCursor() {
     flutterView?.let { view ->
-      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         view.isFocusable = true
         view.requestFocus()
         view.requestPointerCapture()
@@ -73,7 +73,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   private fun unlockCursor() {
     flutterView?.let { view ->
-      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         view.releasePointerCapture()
         isCursorLocked = false
       }
@@ -95,24 +95,56 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     flutterView?.isFocusable = true
     flutterView?.isFocusableInTouchMode = true
     
-    // 设置捕获指针监听器
+    // 设置捕获指针监听器，处理所有类型的事件
     flutterView?.setOnCapturedPointerListener { _, event ->
-      when (event.source) {
-        InputDevice.SOURCE_MOUSE_RELATIVE -> {
-          // 处理鼠标相对移动
+      when (event.actionMasked) {
+        MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
+          // 处理鼠标移动
+          val relX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
+          val relY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
+          val dx = if (relX != 0f) relX else event.x
+          val dy = if (relY != 0f) relY else event.y
           channel.invokeMethod("onCursorMoved", mapOf(
-            "dx" to event.x,
-            "dy" to event.y
+            "dx" to dx,
+            "dy" to dy
           ))
           true
         }
-        InputDevice.SOURCE_TOUCHPAD -> {
-          // 处理触控板事件
-          val relativeX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
-          val relativeY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-          channel.invokeMethod("onCursorMoved", mapOf(
-            "dx" to relativeX,
-            "dy" to relativeY
+        MotionEvent.ACTION_SCROLL -> {
+          // 处理滚轮事件
+          val scrollX = event.getAxisValue(MotionEvent.AXIS_HSCROLL)
+          val scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+          channel.invokeMethod("onCursorScroll", mapOf(
+            "dx" to scrollX,
+            "dy" to scrollY
+          ))
+          true
+        }
+        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_BUTTON_PRESS -> {
+          // 处理鼠标按键按下
+          val buttonId = when (event.actionButton) {
+            MotionEvent.BUTTON_PRIMARY -> 1  // 左键
+            MotionEvent.BUTTON_SECONDARY -> 3  // 右键
+            MotionEvent.BUTTON_TERTIARY -> 2  // 中键
+            else -> event.actionButton
+          }
+          channel.invokeMethod("onCursorButton", mapOf(
+            "buttonId" to buttonId,
+            "isDown" to true
+          ))
+          true
+        }
+        MotionEvent.ACTION_UP, MotionEvent.ACTION_BUTTON_RELEASE -> {
+          // 处理鼠标按键释放
+          val buttonId = when (event.actionButton) {
+            MotionEvent.BUTTON_PRIMARY -> 1  // 左键
+            MotionEvent.BUTTON_SECONDARY -> 3  // 右键
+            MotionEvent.BUTTON_TERTIARY -> 2  // 中键
+            else -> event.actionButton
+          }
+          channel.invokeMethod("onCursorButton", mapOf(
+            "buttonId" to buttonId,
+            "isDown" to false
           ))
           true
         }
