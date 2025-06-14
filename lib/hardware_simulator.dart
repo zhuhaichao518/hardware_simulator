@@ -66,6 +66,11 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.getPlatformVersion();
   }
 
+  //Only used for ios and android.
+  static Future<bool?> getIsMouseConnected() {
+    return HardwareSimulatorPlatform.instance.getIsMouseConnected();
+  }
+
   static Future<int?> getMonitorCount() async {
     return HardwareSimulatorPlatform.instance.getMonitorCount();
   }

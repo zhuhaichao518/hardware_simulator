@@ -48,6 +48,10 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     return version;
   }
 
+  Future<bool?> getIsMouseConnected() {
+    return methodChannel.invokeMethod<bool>('isMouseConnected');
+  }
+
   @override
   Future<void> lockCursor() async {
     await methodChannel.invokeMethod('lockCursor');

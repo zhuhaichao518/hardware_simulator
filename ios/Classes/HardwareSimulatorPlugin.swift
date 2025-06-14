@@ -143,6 +143,11 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         switch call.method {
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
+        case "isMouseConnected":
+            if #available(iOS 14.0, *) {
+              result(!GCMouse.mice().isEmpty)
+            }
+            result(false)
         case "addCursorMoved":
             result(nil)
         case "addCursorButton":
@@ -150,7 +155,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         case "addCursorScroll":
             result(nil)
         case "lockCursor":
-            if #available(iOS 11.0, *) {
+            if #available(iOS 14.0, *) {
                 if let controller = controller() {
                     controller.setLockCursor(newValue:true)
                     controller.setHidingHomeIndicator(newValue: true)
@@ -159,7 +164,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
             }
             result(nil)
         case "unlockCursor":
-            if #available(iOS 11.0, *) {
+            if #available(iOS 14.0, *) {
                 if let controller = controller() {
                     controller.setLockCursor(newValue:false)
                     controller.setHidingHomeIndicator(newValue: false)

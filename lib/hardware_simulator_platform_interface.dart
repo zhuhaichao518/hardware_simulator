@@ -36,6 +36,10 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
+  Future<bool?> getIsMouseConnected() {
+    throw UnimplementedError('getIsMouseConnected() has not been implemented.');
+  }
+
   Future<int?> getMonitorCount() async {
     // if not implemented, just care about main monitor.
     return 1;
