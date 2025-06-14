@@ -63,8 +63,8 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private fun lockCursor() {
     flutterView?.let { view ->
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        view.isFocusable = true
-        view.requestFocus()
+        //view.isFocusable = true
+        //view.requestFocus()
         view.requestPointerCapture()
         isCursorLocked = true
       }
@@ -153,11 +153,11 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     // 监听窗口焦点变化
-    binding.activity.window.decorView.setOnFocusChangeListener { _, hasFocus ->
+    /*binding.activity.window.decorView.setOnFocusChangeListener { _, hasFocus ->
       if (hasFocus && isCursorLocked) {
         flutterView?.requestPointerCapture()
       }
-    }
+    }*/
   }
 
   override fun onDetachedFromActivityForConfigChanges() {
