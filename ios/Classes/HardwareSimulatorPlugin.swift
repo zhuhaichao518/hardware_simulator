@@ -3,96 +3,67 @@ import UIKit
 import GameController
 import ObjectiveC
 
-@available(iOS 13.4, *)
-extension UIViewController {
-    private static var swizzled = false
-    private static var originalPrefersPointerLockedIMP: IMP?
-    
-    static func swizzlePrefersPointerLocked() {
-        if #available(iOS 14.0, *) {
-            if swizzled {
-                return
-            }
+class HomeIndicatorAwareFlutterViewController : FlutterViewController {
+  static var hidingHomeIndicator: Bool = false
+  static var lockCursor: Bool = false
 
-            let originalSelector = #selector(getter: UIViewController.prefersPointerLocked)
-            let swizzledSelector = #selector(UIViewController.swizzled_prefersPointerLocked)
-            
-            guard let originalMethod = class_getInstanceMethod(UIViewController.self, originalSelector),
-                  let swizzledMethod = class_getInstanceMethod(UIViewController.self, swizzledSelector) else {
-                return
-            }
-            
-            // 如果已经 swizzled，先恢复原始实现
-            /*if swizzled {
-                if let originalIMP = originalPrefersPointerLockedIMP {
-                    method_setImplementation(originalMethod, originalIMP)
-                }
-            } else {
-                // 保存原始方法的实现
-                originalPrefersPointerLockedIMP = method_getImplementation(originalMethod)
-            }*/
-            originalPrefersPointerLockedIMP = method_getImplementation(originalMethod)
-            
-            // 设置新的实现
-            method_setImplementation(originalMethod, method_getImplementation(swizzledMethod))
-            swizzled = true
-        }
-    }
+  @available(iOS 11.0, *)
+  override var prefersHomeIndicatorAutoHidden: Bool {
+    return HomeIndicatorAwareFlutterViewController.hidingHomeIndicator
+  }
+
     
-    static func unswizzlePrefersPointerLocked() {
-        if !swizzled {
-            return
+  @available(iOS 11.0, *)
+  override var prefersPointerLocked: Bool {
+    return HomeIndicatorAwareFlutterViewController.lockCursor
+  }
+
+  func setHidingHomeIndicator(newValue: Bool) {
+    if (newValue != HomeIndicatorAwareFlutterViewController.hidingHomeIndicator) {
+      HomeIndicatorAwareFlutterViewController.hidingHomeIndicator = newValue
+      if #available(iOS 11.0, *) {
+        if responds(to: #selector(setNeedsUpdateOfHomeIndicatorAutoHidden)) {
+          setNeedsUpdateOfHomeIndicatorAutoHidden()
         }
-        guard swizzled, let originalIMP = originalPrefersPointerLockedIMP else { return }
-        
+      } else {
+        // Fallback on earlier versions: do nothing
+      }
+    }
+  }
+    
+  func setLockCursor(newValue: Bool) {
+    if (newValue != HomeIndicatorAwareFlutterViewController.lockCursor) {
+        HomeIndicatorAwareFlutterViewController.lockCursor = newValue
         if #available(iOS 14.0, *) {
-            let originalSelector = #selector(getter: UIViewController.prefersPointerLocked)
-            
-            guard let originalMethod = class_getInstanceMethod(UIViewController.self, originalSelector) else {
-                return
-            }
-            
-            // 直接设置回原始实现
-            method_setImplementation(originalMethod, originalIMP)
-            swizzled = false
+          if responds(to: #selector(setNeedsUpdateOfPrefersPointerLocked)) {
+            setNeedsUpdateOfPrefersPointerLocked()
+          }
+        } else {
+          // Fallback on earlier versions: do nothing
         }
     }
-    
-    @available(iOS 14.0, *)
-    @objc func swizzled_prefersPointerLocked() -> Bool {
-        print("swizzled_prefersPointerLocked called")
-        return !GCMouse.mice().isEmpty
+  }
+
+  static var deferredEdges: UIRectEdge = []
+
+  @available(iOS 11.0, *)
+  override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+    return HomeIndicatorAwareFlutterViewController.deferredEdges
+  }
+
+  func setDeferredEdges(newValue: UIRectEdge) {
+    if (newValue != HomeIndicatorAwareFlutterViewController.deferredEdges) {
+      HomeIndicatorAwareFlutterViewController.deferredEdges = newValue
+      if #available(iOS 11.0, *) {
+        setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+      } else {
+        // Fallback on earlier versions: do nothing
+      }
     }
-    
-    /*func disableSystemGestures() {
-        if #available(iOS 11.0, *) {
-            self.modalPresentationStyle = .fullScreen
-            self.edgesForExtendedLayout = []
-            self.setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
-        }
-    }*/
-    
-    /*override open func preferredScreenEdgesDeferringSystemGestures() -> UIRectEdge {
-        return .all
-    }*/
+  }
 }
 
-@available(iOS 13.4, *)
-extension UIView {
-    func hidePointer() {
-        let interaction = UIPointerInteraction(delegate: self)
-        addInteraction(interaction)
-    }
-    
-    func unhidePointer() {
-        for interaction in interactions {
-            if let pointerInteraction = interaction as? UIPointerInteraction {
-                removeInteraction(pointerInteraction)
-            }
-        }
-    }
-}
-
+/* used for other mouse types when CGMouse does not work.
 @available(iOS 13.4, *)
 extension UIView: UIPointerInteractionDelegate {
     public func pointerInteraction(_ interaction: UIPointerInteraction, regionFor request: UIPointerRegionRequest, defaultRegion: UIPointerRegion) -> UIPointerRegion? {
@@ -103,6 +74,7 @@ extension UIView: UIPointerInteractionDelegate {
         return UIPointerStyle.hidden()
     }
 }
+*/
 
 public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
     private var channel: FlutterMethodChannel?
@@ -119,6 +91,17 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         
         instance.startTrackingMouse()
     }
+    
+    private func controller() -> HomeIndicatorAwareFlutterViewController? {
+      guard let window = UIApplication.shared.keyWindow else { print("no window"); return nil }
+      guard let rvc = window.rootViewController else { print("no rvc"); return nil }
+      if let rvc = rvc as? HomeIndicatorAwareFlutterViewController { return rvc }
+      guard let fvc = rvc as? FlutterViewController else { return nil }
+      object_setClass(fvc, HomeIndicatorAwareFlutterViewController.self)
+      let newController = fvc as! HomeIndicatorAwareFlutterViewController
+      window.rootViewController = newController as UIViewController?
+      return newController
+    }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
@@ -132,27 +115,19 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
             result(nil)
         case "lockCursor":
             if #available(iOS 11.0, *) {
-                if let window = UIApplication.shared.windows.first {
-                    if #available(iOS 13.4, *) {
-                        window.rootViewController?.view.hidePointer()
-                    }
-                    if #available(iOS 14.0, *) {
-                        UIViewController.swizzlePrefersPointerLocked()
-                        window.rootViewController?.setNeedsUpdateOfPrefersPointerLocked()
-                    }
+                if let controller = controller() {
+                    controller.setLockCursor(newValue:true)
+                    controller.setHidingHomeIndicator(newValue: true)
+                    controller.setDeferredEdges(newValue: UIRectEdge.all)
                 }
             }
             result(nil)
         case "unlockCursor":
             if #available(iOS 11.0, *) {
-                if let window = UIApplication.shared.windows.first {
-                    if #available(iOS 13.4, *) {
-                        window.rootViewController?.view.unhidePointer()
-                    }
-                    if #available(iOS 14.0, *) {
-                        UIViewController.unswizzlePrefersPointerLocked()
-                        window.rootViewController?.setNeedsUpdateOfPrefersPointerLocked()
-                    }
+                if let controller = controller() {
+                    controller.setLockCursor(newValue:false)
+                    controller.setHidingHomeIndicator(newValue: false)
+                    controller.setDeferredEdges(newValue: UIRectEdge.top)
                 }
             }
             result(nil)
