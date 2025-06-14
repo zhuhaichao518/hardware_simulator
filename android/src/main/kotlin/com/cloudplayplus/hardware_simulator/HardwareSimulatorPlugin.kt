@@ -120,7 +120,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           ))
           true
         }
-        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_BUTTON_PRESS -> {
+        MotionEvent.ACTION_BUTTON_PRESS -> {
           // 处理鼠标按键按下
           val buttonId = when (event.actionButton) {
             MotionEvent.BUTTON_PRIMARY -> 1  // 左键
@@ -134,7 +134,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
           ))
           true
         }
-        MotionEvent.ACTION_UP, MotionEvent.ACTION_BUTTON_RELEASE -> {
+        MotionEvent.ACTION_BUTTON_RELEASE -> {
           // 处理鼠标按键释放
           val buttonId = when (event.actionButton) {
             MotionEvent.BUTTON_PRIMARY -> 1  // 左键
