@@ -14,6 +14,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import org.flame_engine.gamepads_android.GamepadsCompatibleActivity
+import android.view.KeyEvent
 
 /** HardwareSimulatorPlugin */
 class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -31,6 +33,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     channel.setMethodCallHandler(this)
   }
 
+  @RequiresApi(Build.VERSION_CODES.O)
   override fun onMethodCall(call: MethodCall, result: Result) {
     when (call.method) {
       "getPlatformVersion" -> {
@@ -60,42 +63,12 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     }
   }
 
-  private fun lockCursor() {
-    flutterView?.let { view ->
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        //view.isFocusable = true
-        //view.requestFocus()
-        view.requestPointerCapture()
-        isCursorLocked = true
-      }
-    }
-  }
-
-  private fun unlockCursor() {
-    flutterView?.let { view ->
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        view.releasePointerCapture()
-        isCursorLocked = false
-      }
-    }
-  }
-
-  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-    channel.setMethodCallHandler(null)
-  }
-
   @RequiresApi(Build.VERSION_CODES.O)
-  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-    activity = binding.activity
-    
-    // 获取Flutter的根视图
-    flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
-    
-    // 设置视图可聚焦
+  private fun lockCursor() {
+    if (isCursorLocked) return;
+    //val flutterView = activity?.window?.currentFocus
+    flutterView = activity?.window?.decorView?.findViewById<View>(android.R.id.content)
     flutterView?.isFocusable = true
-    flutterView?.isFocusableInTouchMode = true
-    
-    // 设置捕获指针监听器，处理所有类型的事件
     flutterView?.setOnCapturedPointerListener { _, event ->
       when (event.actionMasked) {
         MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
@@ -151,6 +124,66 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         else -> false
       }
     }
+    flutterView?.let { view ->
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        //view.isFocusable = true
+        //view.requestFocus()
+        view.requestPointerCapture()
+        isCursorLocked = true
+      }
+    }
+  }
+
+  private fun unlockCursor() {
+    flutterView?.let { view ->
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        view.releasePointerCapture()
+        isCursorLocked = false
+      }
+    }
+  }
+
+  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    channel.setMethodCallHandler(null)
+  }
+
+  fun isDpadKey(keyCode: Int): Boolean {
+    return keyCode in KeyEvent.KEYCODE_DPAD_UP..KeyEvent.KEYCODE_DPAD_CENTER
+  }
+
+  @RequiresApi(Build.VERSION_CODES.O)
+  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    activity = binding.activity
+
+    val compatibleActivity = activity as GamepadsCompatibleActivity
+    compatibleActivity.registerLockedKeyEventHandler { event ->
+      if (!isCursorLocked) {
+        return@registerLockedKeyEventHandler false
+      }
+      val device = InputDevice.getDevice(event.deviceId)
+      if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
+        // 这是键盘事件
+        if (isDpadKey(event.keyCode) ) {
+          return@registerLockedKeyEventHandler true
+        }
+        channel.invokeMethod("onKeyboardButton", mapOf(
+          "buttonId" to event.keyCode,
+          "isDown" to false
+        ))
+        return@registerLockedKeyEventHandler true
+      } else {
+        return@registerLockedKeyEventHandler false
+      }
+      false
+    }
+    // 获取Flutter的根视图
+    flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
+    
+    // 设置视图可聚焦 不设置无法移动
+    flutterView?.isFocusable = true
+    //flutterView?.isFocusableInTouchMode = true
+    
+    // 设置捕获指针监听器，处理所有类型的事件
 
     // 监听窗口焦点变化
     /*binding.activity.window.decorView.setOnFocusChangeListener { _, hasFocus ->
