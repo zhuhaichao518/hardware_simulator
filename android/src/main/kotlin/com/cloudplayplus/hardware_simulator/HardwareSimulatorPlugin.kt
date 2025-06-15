@@ -65,11 +65,16 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   @RequiresApi(Build.VERSION_CODES.O)
   private fun lockCursor() {
+    flutterView?.let { view ->
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        //view.isFocusable = true
+        view.requestFocus()
+        view.requestPointerCapture()
+      }
+    }
     if (isCursorLocked) return;
-    //val flutterView = activity?.window?.currentFocus
+    isCursorLocked = true;
     flutterView = activity?.window?.decorView?.findViewById<View>(android.R.id.content)
-    //lutterView?.isFocusable = true
-    //flutterView?.
     flutterView?.setOnCapturedPointerListener { _, event ->
       when (event.actionMasked) {
         MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
@@ -125,14 +130,14 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         else -> false
       }
     }
-    flutterView?.let { view ->
+    /*flutterView?.let { view ->
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         //view.isFocusable = true
         view.requestFocus()
         view.requestPointerCapture()
         isCursorLocked = true
       }
-    }
+    }*/
   }
 
   private fun unlockCursor() {
@@ -148,8 +153,8 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     channel.setMethodCallHandler(null)
   }
 
-  fun isDpadKey(keyCode: Int): Boolean {
-    return keyCode in KeyEvent.KEYCODE_DPAD_UP..KeyEvent.KEYCODE_DPAD_CENTER
+  private fun isDpadKey(keyCode: Int): Boolean {
+    return keyCode == KeyEvent.KEYCODE_DPAD_CENTER//in KeyEvent.KEYCODE_DPAD_UP..KeyEvent.KEYCODE_DPAD_CENTER
   }
 
   @RequiresApi(Build.VERSION_CODES.O)
@@ -180,7 +185,6 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       } else {
         return@registerLockedKeyEventHandler false
       }
-      false
     }
     // 获取Flutter的根视图
     flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
