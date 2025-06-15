@@ -68,7 +68,8 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     if (isCursorLocked) return;
     //val flutterView = activity?.window?.currentFocus
     flutterView = activity?.window?.decorView?.findViewById<View>(android.R.id.content)
-    flutterView?.isFocusable = true
+    //lutterView?.isFocusable = true
+    //flutterView?.
     flutterView?.setOnCapturedPointerListener { _, event ->
       when (event.actionMasked) {
         MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
@@ -127,7 +128,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     flutterView?.let { view ->
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         //view.isFocusable = true
-        //view.requestFocus()
+        view.requestFocus()
         view.requestPointerCapture()
         isCursorLocked = true
       }
@@ -166,9 +167,14 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         if (isDpadKey(event.keyCode) ) {
           return@registerLockedKeyEventHandler true
         }
+        val isDown = when (event.action) {
+          KeyEvent.ACTION_DOWN -> true
+          KeyEvent.ACTION_UP -> false
+          else -> false
+        }
         channel.invokeMethod("onKeyboardButton", mapOf(
           "buttonId" to event.keyCode,
-          "isDown" to false
+          "isDown" to isDown
         ))
         return@registerLockedKeyEventHandler true
       } else {
@@ -181,7 +187,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     
     // 设置视图可聚焦 不设置无法移动
     flutterView?.isFocusable = true
-    //flutterView?.isFocusableInTouchMode = true
+    flutterView?.isFocusableInTouchMode = true
     
     // 设置捕获指针监听器，处理所有类型的事件
 

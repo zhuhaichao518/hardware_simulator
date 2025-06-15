@@ -19,17 +19,23 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
           callback(call.arguments['dx'], call.arguments['dy']);
         }
       }
-      if (call.method == "onCursorButton") {
+      else if (call.method == "onCursorButton") {
         for (var callback in cursorPressedCallbacks) {
           callback(call.arguments['buttonId'], call.arguments['isDown']);
         }
       }
-      if (call.method == "onCursorScroll") {
+      // used only when locked cursor and using keyboard for android.
+      else if (call.method == "onKeyboardButton") {
+        for (var callback in keyBoardPressedCallbacks) {
+          callback(call.arguments['buttonId'], call.arguments['isDown']);
+        }
+      }
+      else if (call.method == "onCursorScroll") {
         for (var callback in cursorWheelCallbacks) {
           callback(call.arguments['dx'], call.arguments['dy']);
         }
       }
-      if (call.method == "onCursorImageMessage") {
+      else if (call.method == "onCursorImageMessage") {
         int callbackID = call.arguments['callbackID'];
         if (cursorImageCallbacks.containsKey(callbackID)) {
           cursorImageCallbacks[callbackID]!(call.arguments['message'],
@@ -132,6 +138,19 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   @override
   void removeCursorPressed(CursorPressedCallback callback) {
     cursorPressedCallbacks.remove(callback);
+  }
+
+  final List<KeyboardPressedCallback> keyBoardPressedCallbacks = [];
+
+  @override
+  void addKeyboardPressed(KeyboardPressedCallback callback) {
+    if (!isinitialized) init();
+    keyBoardPressedCallbacks.add(callback);
+  }
+
+  @override
+  void removeKeyboardPressed(KeyboardPressedCallback callback) {
+    keyBoardPressedCallbacks.remove(callback);
   }
 
   final List<CursorWheelCallback> cursorWheelCallbacks = [];

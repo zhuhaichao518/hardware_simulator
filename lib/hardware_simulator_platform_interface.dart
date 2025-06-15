@@ -7,6 +7,7 @@ import 'hardware_simulator_method_channel.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
 typedef CursorPressedCallback = void Function(int button, bool isDown);
+typedef KeyboardPressedCallback = void Function(int button, bool isDown);
 typedef CursorWheelCallback = void Function(double deltaX, double deltaY);
 typedef CursorImageUpdatedCallback = void Function(
     int message, int messageInfo, Uint8List cursorImage);
@@ -84,6 +85,14 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   }
 
   void removeCursorPressed(CursorPressedCallback callback) {
+    throw UnimplementedError('removeCursorPressed() has not been implemented.');
+  }
+
+  void addKeyboardPressed(KeyboardPressedCallback callback) {
+    throw UnimplementedError('addKeyboardPressed() has not been implemented.');
+  }
+
+  void removeKeyboardPressed(KeyboardPressedCallback callback) {
     throw UnimplementedError('removeCursorPressed() has not been implemented.');
   }
 

@@ -118,6 +118,14 @@ class HardwareSimulator {
     HardwareSimulatorPlatform.instance.removeCursorPressed(callback);
   }
 
+  static void addKeyboardPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.addKeyboardPressed(callback);
+  }
+
+  static void removeKeyboardPressed(CursorPressedCallback callback) {
+    HardwareSimulatorPlatform.instance.removeKeyboardPressed(callback);
+  }
+
   static void addCursorWheel(CursorWheelCallback callback) {
     HardwareSimulatorPlatform.instance.addCursorWheel(callback);
   }
