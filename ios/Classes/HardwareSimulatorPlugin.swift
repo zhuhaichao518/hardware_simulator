@@ -168,7 +168,7 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
                 if let controller = controller() {
                     controller.setLockCursor(newValue:false)
                     controller.setHidingHomeIndicator(newValue: false)
-                    controller.setDeferredEdges(newValue: UIRectEdge.top)
+                    controller.setDeferredEdges(newValue: UIRectEdge.init(rawValue: 0))
                 }
             }
             result(nil)
