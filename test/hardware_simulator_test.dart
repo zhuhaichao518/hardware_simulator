@@ -152,6 +152,22 @@ class MockHardwareSimulatorPlatform
     // TODO: implement unregisterService
     throw UnimplementedError();
   }
+  
+  @override
+  void addKeyboardPressed(KeyboardPressedCallback callback) {
+    // TODO: implement addKeyboardPressed
+  }
+  
+  @override
+  Future<bool?> getIsMouseConnected() {
+    // TODO: implement getIsMouseConnected
+    throw UnimplementedError();
+  }
+  
+  @override
+  void removeKeyboardPressed(KeyboardPressedCallback callback) {
+    // TODO: implement removeKeyboardPressed
+  }
 }
 
 void main() {
