@@ -178,4 +178,16 @@ class HardwareSimulator {
   static Future<GameController?> createGameController() {
     return GameController.createGameController();
   }
+
+  static Future<bool> initializeParsec() {
+    return HardwareSimulatorPlatform.instance.initializeParsec();
+  }
+
+  static Future<int> createDisplay() {
+    return HardwareSimulatorPlatform.instance.createDisplay();
+  }
+
+  static Future<bool> removeDisplay(int displayId) {
+    return HardwareSimulatorPlatform.instance.removeDisplay(displayId);
+  }
 }

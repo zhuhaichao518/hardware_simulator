@@ -243,6 +243,54 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.performTouchEvent(x, y, touchId, false, 0);
   }
 
+  int _currentDisplayId = -1; // 存储当前创建的显示器ID
+
+  void createDisplay() async {
+    try {
+      // First initialize Parsec
+      bool initialized = await HardwareSimulator.initializeParsec();
+      print('Parsec initialized: $initialized');
+
+      if (initialized) {
+        var res1 = await HardwareSimulator.createDisplay();
+        print(
+          '_billdSimulatorPlugin.createDisplay Ok, display ID: $res1',
+        );
+        setState(() {
+          _currentDisplayId = res1;
+        });
+      } else {
+        print('Failed to initialize Parsec');
+      }
+    } catch (e) {
+      print('Errorrr: $e');
+    }
+  }
+
+  void removeDisplay() async {
+    try {
+      if(_currentDisplayId==-1){
+        return;
+      }
+      bool removed =
+          await HardwareSimulator.removeDisplay(_currentDisplayId);
+      if (removed) {
+        print(
+          'Display $_currentDisplayId removed successfully',
+        );
+        setState(() {
+          _currentDisplayId = -1;
+        });
+      } else {
+        print(
+          'Failed to remove display $_currentDisplayId',
+        );
+      }
+    } catch (e) {
+      print('Error removing display: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -407,6 +455,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
               onPressed: _touchUp,
               child: Text('Touch Up'),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: createDisplay,
+              child: Text('createDisplay'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: removeDisplay,
+              child: Text('removeDisplay: $_currentDisplayId'),
             ),
           ],
         ),

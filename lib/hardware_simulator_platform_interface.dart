@@ -166,4 +166,16 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError(
         'removeGameController() has not been implemented.');
   }
+  
+  Future<bool> initializeParsec() {
+    throw UnimplementedError('initializeParsec() has not been implemented.');
+  }
+
+  Future<int> createDisplay() {
+    throw UnimplementedError('createDisplay() has not been implemented.');
+  }
+
+  Future<bool> removeDisplay(int displayId) {
+    throw UnimplementedError('removeDisplay() has not been implemented.');
+  }
 }

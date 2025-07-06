@@ -36,6 +36,9 @@ add_library(${PLUGIN_NAME} SHARED
   ${PLUGIN_SOURCES}
 )
 
+# Add specific compiler options to ignore warnings from parsec-vdd.h
+target_compile_options(${PLUGIN_NAME} PRIVATE /wd"4245" /wd"4505")
+
 # Apply a standard set of build settings that are configured in the
 # application-level CMakeLists.txt. This can be removed for plugins that want
 # full control over build settings.

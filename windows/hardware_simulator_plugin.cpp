@@ -24,6 +24,7 @@
 #include <shellapi.h>
 #include <shlwapi.h>  // PathCombineW, PathRemoveFileSpecW
 #include <string>
+#include "parsec-vdd.h"
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -45,6 +46,9 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
+
+static HANDLE g_parsec = nullptr;
+static int g_displayCount = 0;
 
 // auto repeat feature
 struct KeyState {
@@ -929,6 +933,36 @@ void HardwareSimulatorPlugin::HandleMethodCall(
             static_cast<uint32_t>(std::get<int>((touchId)))
         );
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("initializeParsec") == 0) {
+    if (g_parsec == nullptr) {
+      g_parsec = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
+      if (g_parsec != nullptr && g_parsec != INVALID_HANDLE_VALUE) {
+        result->Success(flutter::EncodableValue(true));
+      } else {
+        result->Error("INIT_FAILED", "Failed to initialize Parsec");
+      }
+    } else {
+      result->Success(flutter::EncodableValue(true));
+    }
+  } else if (method_call.method_name().compare("createDisplay") == 0) {
+     if (g_parsec) {
+         int displayId = parsec_vdd::VddAddDisplay(g_parsec);
+         if (displayId >= 0) {
+             result->Success(flutter::EncodableValue(displayId));
+         } else {
+             result->Error("CREATE_FAILED", "Failed to create display");
+         }
+     } else {
+         result->Error("NOT_INITIALIZED", "Parsec not initialized");
+     }
+  } else if (method_call.method_name().compare("removeDisplay") == 0) {
+     auto displayId = (args->find(flutter::EncodableValue("displayId")))->second;
+     if (g_parsec) {
+         parsec_vdd::VddRemoveDisplay(g_parsec, static_cast<int>(std::get<int>((displayId))));
+         result->Success(flutter::EncodableValue(true));
+     } else {
+         result->Error("NOT_INITIALIZED", "Parsec not initialized");
+     }
   } else {
     result->NotImplemented();
   }
