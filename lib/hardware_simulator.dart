@@ -179,8 +179,8 @@ class HardwareSimulator {
     return GameController.createGameController();
   }
 
-  static Future<bool> initializeParsec() {
-    return HardwareSimulatorPlatform.instance.initializeParsec();
+  static Future<bool> initParsecVdd() {
+    return HardwareSimulatorPlatform.instance.initParsecVdd();
   }
 
   static Future<int> createDisplay() {

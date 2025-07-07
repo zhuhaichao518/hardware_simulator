@@ -247,9 +247,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void createDisplay() async {
     try {
-      // First initialize Parsec
-      bool initialized = await HardwareSimulator.initializeParsec();
-      print('Parsec initialized: $initialized');
+      // First initialize parsec-vdd
+      bool initialized = await HardwareSimulator.initParsecVdd();
+      print('parsec-vdd initialized: $initialized');
 
       if (initialized) {
         var res1 = await HardwareSimulator.createDisplay();
@@ -260,7 +260,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           _currentDisplayId = res1;
         });
       } else {
-        print('Failed to initialize Parsec');
+        print('Failed to initialize parsec-vdd');
       }
     } catch (e) {
       print('Errorrr: $e');

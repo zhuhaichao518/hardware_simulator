@@ -48,7 +48,6 @@ POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
 
 static HANDLE g_parsec = nullptr;
-static int g_displayCount = 0;
 
 // auto repeat feature
 struct KeyState {
@@ -933,13 +932,13 @@ void HardwareSimulatorPlugin::HandleMethodCall(
             static_cast<uint32_t>(std::get<int>((touchId)))
         );
         result->Success(nullptr);
-  } else if (method_call.method_name().compare("initializeParsec") == 0) {
+  } else if (method_call.method_name().compare("initParsecVdd") == 0) {
     if (g_parsec == nullptr) {
       g_parsec = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
       if (g_parsec != nullptr && g_parsec != INVALID_HANDLE_VALUE) {
         result->Success(flutter::EncodableValue(true));
       } else {
-        result->Error("INIT_FAILED", "Failed to initialize Parsec");
+        result->Error("INIT_FAILED", "Failed to initialize ParsecVdd");
       }
     } else {
       result->Success(flutter::EncodableValue(true));

@@ -285,8 +285,8 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
   
   @override
-  Future<bool> initializeParsec() async {
-    return await methodChannel.invokeMethod('initializeParsec');
+  Future<bool> initParsecVdd() async {
+    return await methodChannel.invokeMethod('initParsecVdd');
   }
 
   @override
