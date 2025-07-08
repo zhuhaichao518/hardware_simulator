@@ -283,4 +283,21 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       <String, dynamic>{'id': controllerId, 'action': action},
     );
   }
+  
+  @override
+  Future<bool> initParsecVdd() async {
+    return await methodChannel.invokeMethod('initParsecVdd');
+  }
+
+  @override
+  Future<int> createDisplay() async {
+    return await methodChannel.invokeMethod('createDisplay');
+  }
+
+  @override
+  Future<bool> removeDisplay(int displayId) async {
+    return await methodChannel.invokeMethod('removeDisplay', {
+      'displayId': displayId,
+    });
+  }
 }
