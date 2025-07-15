@@ -175,6 +175,10 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('createDisplay() has not been implemented.');
   }
 
+  Future<int> createDisplayWithConfig(int width, int height, int refreshRate) {
+    throw UnimplementedError('createDisplayWithConfig() has not been implemented.');
+  }
+
   Future<bool> removeDisplay(int displayId) {
     throw UnimplementedError('removeDisplay() has not been implemented.');
   }

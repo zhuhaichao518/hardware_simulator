@@ -295,6 +295,15 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
+  Future<int> createDisplayWithConfig(int width, int height, int refreshRate) async {
+    return await methodChannel.invokeMethod('createDisplayWithConfig', {
+      'width': width,
+      'height': height,
+      'refreshRate': refreshRate,
+    });
+  }
+
+  @override
   Future<bool> removeDisplay(int displayId) async {
     return await methodChannel.invokeMethod('removeDisplay', {
       'displayId': displayId,

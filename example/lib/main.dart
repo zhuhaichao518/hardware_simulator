@@ -243,11 +243,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.performTouchEvent(x, y, touchId, false, 0);
   }
 
-  int _currentDisplayId = -1; // 存储当前创建的显示器ID
+  int _currentDisplayId = -1;
+  
+  String _selectedResolution = '1920x1080';
+  int _selectedRefreshRate = 60;
+  
+  final List<String> _resolutions = [
+    '1920x1080',
+    '2560x1440', 
+    '3840x2160'
+  ];
+  
+  final List<int> _refreshRates = [24, 30, 60, 144, 240];
 
   void createDisplay() async {
     try {
-      // First initialize parsec-vdd
       bool initialized = await HardwareSimulator.initParsecVdd();
       print('parsec-vdd initialized: $initialized');
 
@@ -264,6 +274,35 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       }
     } catch (e) {
       print('Errorrr: $e');
+    }
+  }
+
+  void createDisplayWithConfig() async {
+    try {
+      bool initialized = await HardwareSimulator.initParsecVdd();
+      print('parsec-vdd initialized: $initialized');
+
+      if (initialized) {
+        List<String> resolution = _selectedResolution.split('x');
+        int width = int.parse(resolution[0]);
+        int height = int.parse(resolution[1]);
+        
+        var res1 = await HardwareSimulator.createDisplayWithConfig(
+          width, 
+          height, 
+          _selectedRefreshRate
+        );
+        print(
+          'createDisplayWithConfig Ok, display ID: $res1, resolution: ${width}x$height@${_selectedRefreshRate}Hz',
+        );
+        setState(() {
+          _currentDisplayId = res1;
+        });
+      } else {
+        print('Failed to initialize parsec-vdd');
+      }
+    } catch (e) {
+      print('Error creating display with config: $e');
     }
   }
 
@@ -472,6 +511,51 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               child: Text('removeDisplay: $_currentDisplayId'),
             ),
           ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('分辨率: '),
+            DropdownButton<String>(
+              value: _selectedResolution,
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedResolution = newValue!;
+                });
+              },
+              items: _resolutions.map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+            ),
+            SizedBox(width: 20),
+            Text('刷新率: '),
+            DropdownButton<int>(
+              value: _selectedRefreshRate,
+              onChanged: (int? newValue) {
+                setState(() {
+                  _selectedRefreshRate = newValue!;
+                });
+              },
+              items: _refreshRates.map<DropdownMenuItem<int>>((int value) {
+                return DropdownMenuItem<int>(
+                  value: value,
+                  child: Text('${value}Hz'),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: createDisplayWithConfig,
+          child: Text('创建自定义显示器 (${_selectedResolution}@${_selectedRefreshRate}Hz)'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
         ),
       ],
     );

@@ -187,6 +187,10 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.createDisplay();
   }
 
+  static Future<int> createDisplayWithConfig(int width, int height, int refreshRate) {
+    return HardwareSimulatorPlatform.instance.createDisplayWithConfig(width, height, refreshRate);
+  }
+
   static Future<bool> removeDisplay(int displayId) {
     return HardwareSimulatorPlatform.instance.removeDisplay(displayId);
   }

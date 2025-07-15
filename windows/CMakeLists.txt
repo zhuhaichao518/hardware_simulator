@@ -26,6 +26,10 @@ list(APPEND PLUGIN_SOURCES
   "gamecontroller_manager.h"
   "notification_window.cc"
   "notification_window.h"
+  "virtual_display.cc"
+  "virtual_display.h"
+  "virtual_display_control.cc"
+  "virtual_display_control.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -68,4 +72,21 @@ set(hardware_simulator_bundled_libraries
   "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/lib/x64/ViGEmClient.dll"
   PARENT_SCOPE
 )
+
+# Optional: Create example executable for testing virtual display functionality
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_executable(virtual_display_example
+    "virtual_display_example.cc"
+    "virtual_display.cc"
+    "virtual_display_control.cc"
+  )
+  
+  target_compile_options(virtual_display_example PRIVATE /wd"4245" /wd"4505")
+  target_include_directories(virtual_display_example PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+  )
+  
+  # Link necessary libraries for the example
+  target_link_libraries(virtual_display_example PRIVATE)
+endif()
 

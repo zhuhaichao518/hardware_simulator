@@ -3,6 +3,7 @@
 #include "cursor_monitor.h"
 #include "gamecontroller_manager.h"
 #include "notification_window.h"
+#include "virtual_display_control.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -24,7 +25,6 @@
 #include <shellapi.h>
 #include <shlwapi.h>  // PathCombineW, PathRemoveFileSpecW
 #include <string>
-#include "parsec-vdd.h"
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -46,8 +46,6 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
-
-static HANDLE g_parsec = nullptr;
 
 // auto repeat feature
 struct KeyState {
@@ -933,9 +931,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         );
         result->Success(nullptr);
   } else if (method_call.method_name().compare("initParsecVdd") == 0) {
-    if (g_parsec == nullptr) {
-      g_parsec = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
-      if (g_parsec != nullptr && g_parsec != INVALID_HANDLE_VALUE) {
+    if (!VirtualDisplayControl::IsInitialized()) {
+      if (VirtualDisplayControl::Initialize()) {
         result->Success(flutter::EncodableValue(true));
       } else {
         result->Error("INIT_FAILED", "Failed to initialize ParsecVdd");
@@ -944,8 +941,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
       result->Success(flutter::EncodableValue(true));
     }
   } else if (method_call.method_name().compare("createDisplay") == 0) {
-     if (g_parsec) {
-         int displayId = parsec_vdd::VddAddDisplay(g_parsec);
+     if (VirtualDisplayControl::IsInitialized()) {
+         int displayId = VirtualDisplayControl::AddDisplay();
          if (displayId >= 0) {
              result->Success(flutter::EncodableValue(displayId));
          } else {
@@ -954,14 +951,44 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
+  } else if (method_call.method_name().compare("createDisplayWithConfig") == 0) {
+     if (VirtualDisplayControl::IsInitialized()) {
+         auto width = (args->find(flutter::EncodableValue("width")))->second;
+         auto height = (args->find(flutter::EncodableValue("height")))->second;
+         auto refreshRate = (args->find(flutter::EncodableValue("refreshRate")))->second;
+         
+         int displayId = VirtualDisplayControl::AddDisplay(
+             static_cast<int>(std::get<int>(width)),
+             static_cast<int>(std::get<int>(height)),
+             static_cast<int>(std::get<int>(refreshRate))
+         );
+         
+         if (displayId >= 0) {
+             result->Success(flutter::EncodableValue(displayId));
+         } else {
+             result->Error("CREATE_FAILED", "Failed to create display with config");
+         }
+     } else {
+         result->Error("NOT_INITIALIZED", "Parsec not initialized");
+     }
   } else if (method_call.method_name().compare("removeDisplay") == 0) {
      auto displayId = (args->find(flutter::EncodableValue("displayId")))->second;
-     if (g_parsec) {
-         parsec_vdd::VddRemoveDisplay(g_parsec, static_cast<int>(std::get<int>((displayId))));
+     if (VirtualDisplayControl::IsInitialized()) {
+        VirtualDisplayControl::RemoveDisplay(static_cast<int>(std::get<int>((displayId))));
          result->Success(flutter::EncodableValue(true));
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
+  } else if (method_call.method_name().compare("getVddInfo") == 0) {
+     if (VirtualDisplayControl::IsInitialized()) {
+         std::string info = VirtualDisplayControl::GetVddInfo();
+         result->Success(flutter::EncodableValue(info));
+     } else {
+         result->Error("NOT_INITIALIZED", "Parsec not initialized");
+     }
+  } else if (method_call.method_name().compare("checkVddStatus") == 0) {
+     bool status = VirtualDisplayControl::CheckVddStatus();
+     result->Success(flutter::EncodableValue(status));
   } else {
     result->NotImplemented();
   }
