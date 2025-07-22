@@ -18,5 +18,15 @@
             "cwd": "example",
             "vmServiceUri": "${command:dart.promptForVmService}" // Prompt for the VM Service URI
         },
+        {
+        "name": "Launch Flutter Windows Example",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/example/build/windows/x64/runner/Debug/hardware_simulator_example.exe",
+        "args": [],              
+        "cwd": "${workspaceFolder}/example/build/windows/x64/runner/Debug",
+        "stopAtEntry": false,    
+        "externalConsole": false  
+        }
     ]
 }

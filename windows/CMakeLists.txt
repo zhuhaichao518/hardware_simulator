@@ -63,7 +63,9 @@ include_directories(
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin 
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/lib/x64/ViGEmClient.lib")
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/vigembus/lib/x64/ViGEmClient.lib"
+  setupapi
+  cfgmgr32)
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

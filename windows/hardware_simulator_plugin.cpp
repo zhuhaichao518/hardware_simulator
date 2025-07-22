@@ -979,16 +979,77 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
-  } else if (method_call.method_name().compare("getVddInfo") == 0) {
-     if (VirtualDisplayControl::IsInitialized()) {
-         std::string info = VirtualDisplayControl::GetVddInfo();
-         result->Success(flutter::EncodableValue(info));
-     } else {
-         result->Error("NOT_INITIALIZED", "Parsec not initialized");
-     }
   } else if (method_call.method_name().compare("checkVddStatus") == 0) {
      bool status = VirtualDisplayControl::CheckVddStatus();
      result->Success(flutter::EncodableValue(status));
+  } else if (method_call.method_name().compare("getAllDisplays") == 0) {
+     int displayCount = VirtualDisplayControl::GetAllDisplays();
+     result->Success(flutter::EncodableValue(displayCount));
+  } else if (method_call.method_name().compare("getDisplayList") == 0) {
+     // Get detailed display information
+     flutter::EncodableList displayList;
+     auto displays = VirtualDisplayControl::GetDetailedDisplayList();
+     
+     for (const auto& display : displays) {
+         flutter::EncodableMap displayMap;
+         
+         // Map C++ fields to Dart DisplayData fields
+         displayMap[flutter::EncodableValue("index")] = flutter::EncodableValue(display.index);
+         displayMap[flutter::EncodableValue("width")] = flutter::EncodableValue(display.width);
+         displayMap[flutter::EncodableValue("height")] = flutter::EncodableValue(display.height);
+         displayMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(display.refresh_rate);
+         displayMap[flutter::EncodableValue("bitDepth")] = flutter::EncodableValue(display.bit_depth);
+         displayMap[flutter::EncodableValue("active")] = flutter::EncodableValue(display.active);
+         displayMap[flutter::EncodableValue("displayUid")] = flutter::EncodableValue(display.display_uid);
+         displayMap[flutter::EncodableValue("deviceName")] = flutter::EncodableValue(display.device_name);
+         displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
+         displayMap[flutter::EncodableValue("deviceDescription")] = flutter::EncodableValue(display.device_description);
+         displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
+         displayMap[flutter::EncodableValue("displayId")] = flutter::EncodableValue(display.display_id);
+         
+         displayList.push_back(flutter::EncodableValue(displayMap));
+     }
+     
+     result->Success(flutter::EncodableValue(displayList));
+  } else if (method_call.method_name().compare("changeDisplaySettings") == 0) {
+     // Change display settings
+     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+     if (!arguments) {
+         result->Error("INVALID_ARGUMENTS", "Arguments must be a map");
+         return;
+     }
+     
+     // Get display index
+     auto index_it = arguments->find(flutter::EncodableValue("index"));
+     if (index_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'index' argument");
+         return;
+     }
+     int display_index = std::get<int>(index_it->second);
+     
+     // Get new configuration
+     auto width_it = arguments->find(flutter::EncodableValue("width"));
+     auto height_it = arguments->find(flutter::EncodableValue("height"));
+     auto refresh_rate_it = arguments->find(flutter::EncodableValue("refreshRate"));
+     
+     if (width_it == arguments->end() || height_it == arguments->end() || refresh_rate_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing width, height, or refreshRate arguments");
+         return;
+     }
+     
+     VirtualDisplay::DisplayConfig new_config;
+     new_config.width = std::get<int>(width_it->second);
+     new_config.height = std::get<int>(height_it->second);
+     new_config.refresh_rate = std::get<int>(refresh_rate_it->second);
+     
+     // Optional bit depth
+     auto bit_depth_it = arguments->find(flutter::EncodableValue("bitDepth"));
+     if (bit_depth_it != arguments->end()) {
+         new_config.bit_depth = std::get<int>(bit_depth_it->second);
+     }
+     
+     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_index, new_config);
+     result->Success(flutter::EncodableValue(success));
   } else {
     result->NotImplemented();
   }

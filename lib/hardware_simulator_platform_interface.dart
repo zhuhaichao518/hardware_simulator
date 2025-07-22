@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'hardware_simulator_method_channel.dart';
+import 'display_data.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
 typedef CursorPressedCallback = void Function(int button, bool isDown);
@@ -181,5 +182,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
 
   Future<bool> removeDisplay(int displayId) {
     throw UnimplementedError('removeDisplay() has not been implemented.');
+  }
+
+  Future<int> getAllDisplays() {
+    throw UnimplementedError('getAllDisplays() has not been implemented.');
+  }
+
+  Future<List<DisplayData>> getDisplayList() {
+    throw UnimplementedError('getDisplayList() has not been implemented.');
+  }
+
+  Future<bool> changeDisplaySettings(int index, int width, int height, int refreshRate, {int? bitDepth}) {
+    throw UnimplementedError('changeDisplaySettings() has not been implemented.');
   }
 }

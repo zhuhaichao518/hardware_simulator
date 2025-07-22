@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'hardware_simulator_platform_interface.dart';
+import 'display_data.dart';
 
 /// An implementation of [HardwareSimulatorPlatform] that uses method channels.
 class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
@@ -308,5 +309,39 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     return await methodChannel.invokeMethod('removeDisplay', {
       'displayId': displayId,
     });
+  }
+
+  @override
+  Future<int> getAllDisplays() async {
+    return await methodChannel.invokeMethod('getAllDisplays');
+  }
+
+  @override
+  Future<List<DisplayData>> getDisplayList() async {
+    final result = await methodChannel.invokeMethod('getDisplayList');
+    if (result == null) return [];
+    
+    final List<dynamic> dynamicList = List<dynamic>.from(result);
+    final List<Map<String, dynamic>> mapList = dynamicList.map((item) {
+      return Map<String, dynamic>.from(item as Map);
+    }).toList();
+    
+    return mapList.map((map) => DisplayData.fromMap(map)).toList();
+  }
+
+  @override
+  Future<bool> changeDisplaySettings(int index, int width, int height, int refreshRate, {int? bitDepth}) async {
+    final Map<String, dynamic> arguments = {
+      'index': index,
+      'width': width,
+      'height': height,
+      'refreshRate': refreshRate,
+    };
+    
+    if (bitDepth != null) {
+      arguments['bitDepth'] = bitDepth;
+    }
+    
+    return await methodChannel.invokeMethod('changeDisplaySettings', arguments);
   }
 }

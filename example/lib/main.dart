@@ -8,6 +8,7 @@ import 'package:hardware_simulator/hardware_simulator.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'fps_game_example.dart';
+import 'display_manager_page.dart';
 
 void main() {
   //SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
@@ -330,6 +331,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }
   }
 
+  void getAllDisplays() async {
+    try {
+      int displayCount = await HardwareSimulator.getAllDisplays();
+      print('Found $displayCount displays');
+    } catch (e) {
+      print('Error getting display count: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -344,6 +354,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             );
           },
           child: Text('进入FPS游戏示例'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            textStyle: TextStyle(fontSize: 18),
+          ),
+        ),
+        SizedBox(height: 10),
+        // 添加导航按钮到显示器管理页面
+        ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => DisplayManagerPage()),
+            );
+          },
+          child: Text('显示器管理'),
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             textStyle: TextStyle(fontSize: 18),
@@ -509,6 +534,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
               onPressed: removeDisplay,
               child: Text('removeDisplay: $_currentDisplayId'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: getAllDisplays,
+              child: Text('getAllDisplays'),
             ),
           ],
         ),

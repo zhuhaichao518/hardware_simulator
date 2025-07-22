@@ -1,5 +1,5 @@
 import 'hardware_simulator_platform_interface.dart';
-import 'package:flutter/services.dart';
+import 'display_data.dart';
 
 class HWKeyboard {
   HWKeyboard();
@@ -53,8 +53,6 @@ class GameController {
 }
 
 class HardwareSimulator {
-  static const MethodChannel _channel = MethodChannel('hardware_simulator');
-
   //For keyboard and mouse, it is a singleton. For other hardwares like game controllers,
   //it should be plugged in and then used.
   static HWKeyboard keyboard = HWKeyboard();
@@ -193,5 +191,17 @@ class HardwareSimulator {
 
   static Future<bool> removeDisplay(int displayId) {
     return HardwareSimulatorPlatform.instance.removeDisplay(displayId);
+  }
+
+  static Future<int> getAllDisplays() {
+    return HardwareSimulatorPlatform.instance.getAllDisplays();
+  }
+
+  static Future<List<DisplayData>> getDisplayList() {
+    return HardwareSimulatorPlatform.instance.getDisplayList();
+  }
+
+  static Future<bool> changeDisplaySettings(int index, int width, int height, int refreshRate, {int? bitDepth}) {
+    return HardwareSimulatorPlatform.instance.changeDisplaySettings(index, width, height, refreshRate, bitDepth: bitDepth);
   }
 }
