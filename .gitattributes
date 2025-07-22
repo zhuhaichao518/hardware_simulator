@@ -1,0 +1,16 @@
+# 设置默认行为，统一使用LF作为行尾符
+* text=auto eol=lf
+
+# Windows批处理文件使用CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不处理
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.dll binary
+*.exe binary
+*.lib binary

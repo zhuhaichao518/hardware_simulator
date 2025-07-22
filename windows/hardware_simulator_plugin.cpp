@@ -3,6 +3,7 @@
 #include "cursor_monitor.h"
 #include "gamecontroller_manager.h"
 #include "notification_window.h"
+#include "virtual_display_control.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -24,7 +25,6 @@
 #include <shellapi.h>
 #include <shlwapi.h>  // PathCombineW, PathRemoveFileSpecW
 #include <string>
-#include "parsec-vdd.h"
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -46,8 +46,6 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
-
-static HANDLE g_parsec = nullptr;
 
 // auto repeat feature
 struct KeyState {
@@ -933,9 +931,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         );
         result->Success(nullptr);
   } else if (method_call.method_name().compare("initParsecVdd") == 0) {
-    if (g_parsec == nullptr) {
-      g_parsec = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
-      if (g_parsec != nullptr && g_parsec != INVALID_HANDLE_VALUE) {
+    if (!VirtualDisplayControl::IsInitialized()) {
+      if (VirtualDisplayControl::Initialize()) {
         result->Success(flutter::EncodableValue(true));
       } else {
         result->Error("INIT_FAILED", "Failed to initialize ParsecVdd");
@@ -944,8 +941,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
       result->Success(flutter::EncodableValue(true));
     }
   } else if (method_call.method_name().compare("createDisplay") == 0) {
-     if (g_parsec) {
-         int displayId = parsec_vdd::VddAddDisplay(g_parsec);
+     if (VirtualDisplayControl::IsInitialized()) {
+         int displayId = VirtualDisplayControl::AddDisplay();
          if (displayId >= 0) {
              result->Success(flutter::EncodableValue(displayId));
          } else {
@@ -954,14 +951,105 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
+  } else if (method_call.method_name().compare("createDisplayWithConfig") == 0) {
+     if (VirtualDisplayControl::IsInitialized()) {
+         auto width = (args->find(flutter::EncodableValue("width")))->second;
+         auto height = (args->find(flutter::EncodableValue("height")))->second;
+         auto refreshRate = (args->find(flutter::EncodableValue("refreshRate")))->second;
+         
+         int displayId = VirtualDisplayControl::AddDisplay(
+             static_cast<int>(std::get<int>(width)),
+             static_cast<int>(std::get<int>(height)),
+             static_cast<int>(std::get<int>(refreshRate))
+         );
+         
+         if (displayId >= 0) {
+             result->Success(flutter::EncodableValue(displayId));
+         } else {
+             result->Error("CREATE_FAILED", "Failed to create display with config");
+         }
+     } else {
+         result->Error("NOT_INITIALIZED", "Parsec not initialized");
+     }
   } else if (method_call.method_name().compare("removeDisplay") == 0) {
      auto displayId = (args->find(flutter::EncodableValue("displayId")))->second;
-     if (g_parsec) {
-         parsec_vdd::VddRemoveDisplay(g_parsec, static_cast<int>(std::get<int>((displayId))));
+     if (VirtualDisplayControl::IsInitialized()) {
+        VirtualDisplayControl::RemoveDisplay(static_cast<int>(std::get<int>((displayId))));
          result->Success(flutter::EncodableValue(true));
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
+  } else if (method_call.method_name().compare("checkVddStatus") == 0) {
+     bool status = VirtualDisplayControl::CheckVddStatus();
+     result->Success(flutter::EncodableValue(status));
+  } else if (method_call.method_name().compare("getAllDisplays") == 0) {
+     int displayCount = VirtualDisplayControl::GetAllDisplays();
+     result->Success(flutter::EncodableValue(displayCount));
+  } else if (method_call.method_name().compare("getDisplayList") == 0) {
+     // Get detailed display information
+     flutter::EncodableList displayList;
+     auto displays = VirtualDisplayControl::GetDetailedDisplayList();
+     
+     for (const auto& display : displays) {
+         flutter::EncodableMap displayMap;
+         
+         // Map C++ fields to Dart DisplayData fields
+         displayMap[flutter::EncodableValue("index")] = flutter::EncodableValue(display.index);
+         displayMap[flutter::EncodableValue("width")] = flutter::EncodableValue(display.width);
+         displayMap[flutter::EncodableValue("height")] = flutter::EncodableValue(display.height);
+         displayMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(display.refresh_rate);
+         displayMap[flutter::EncodableValue("bitDepth")] = flutter::EncodableValue(display.bit_depth);
+         displayMap[flutter::EncodableValue("active")] = flutter::EncodableValue(display.active);
+         displayMap[flutter::EncodableValue("displayUid")] = flutter::EncodableValue(display.display_uid);
+         displayMap[flutter::EncodableValue("deviceName")] = flutter::EncodableValue(display.device_name);
+         displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
+         displayMap[flutter::EncodableValue("deviceDescription")] = flutter::EncodableValue(display.device_description);
+         displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
+         displayMap[flutter::EncodableValue("displayId")] = flutter::EncodableValue(display.display_id);
+         
+         displayList.push_back(flutter::EncodableValue(displayMap));
+     }
+     
+     result->Success(flutter::EncodableValue(displayList));
+  } else if (method_call.method_name().compare("changeDisplaySettings") == 0) {
+     // Change display settings
+     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+     if (!arguments) {
+         result->Error("INVALID_ARGUMENTS", "Arguments must be a map");
+         return;
+     }
+     
+     // Get display index
+     auto index_it = arguments->find(flutter::EncodableValue("index"));
+     if (index_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'index' argument");
+         return;
+     }
+     int display_index = std::get<int>(index_it->second);
+     
+     // Get new configuration
+     auto width_it = arguments->find(flutter::EncodableValue("width"));
+     auto height_it = arguments->find(flutter::EncodableValue("height"));
+     auto refresh_rate_it = arguments->find(flutter::EncodableValue("refreshRate"));
+     
+     if (width_it == arguments->end() || height_it == arguments->end() || refresh_rate_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing width, height, or refreshRate arguments");
+         return;
+     }
+     
+     VirtualDisplay::DisplayConfig new_config;
+     new_config.width = std::get<int>(width_it->second);
+     new_config.height = std::get<int>(height_it->second);
+     new_config.refresh_rate = std::get<int>(refresh_rate_it->second);
+     
+     // Optional bit depth
+     auto bit_depth_it = arguments->find(flutter::EncodableValue("bitDepth"));
+     if (bit_depth_it != arguments->end()) {
+         new_config.bit_depth = std::get<int>(bit_depth_it->second);
+     }
+     
+     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_index, new_config);
+     result->Success(flutter::EncodableValue(success));
   } else {
     result->NotImplemented();
   }
