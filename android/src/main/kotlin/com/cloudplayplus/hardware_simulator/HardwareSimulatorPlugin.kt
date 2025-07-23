@@ -110,6 +110,11 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             MotionEvent.BUTTON_TERTIARY -> 2  // 中键
             else -> event.actionButton
           }
+          if (isAndroidTV && event.actionButton == MotionEvent.BUTTON_BACK) {
+            // For Android TV, mouse right click is recognized as BUTTON_BACK.
+            // It is already handled in registerLockedKeyEventHandler.
+            return@setOnCapturedPointerListener true
+          }
           channel.invokeMethod("onCursorButton", mapOf(
             "buttonId" to buttonId,
             "isDown" to true
@@ -123,6 +128,11 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             MotionEvent.BUTTON_SECONDARY -> 3  // 右键
             MotionEvent.BUTTON_TERTIARY -> 2  // 中键
             else -> event.actionButton
+          }
+          if (isAndroidTV && event.actionButton == MotionEvent.BUTTON_BACK) {
+            // For Android TV, mouse right click is recognized as BUTTON_BACK.
+            // It is already handled in registerLockedKeyEventHandler.
+            return@setOnCapturedPointerListener true
           }
           channel.invokeMethod("onCursorButton", mapOf(
             "buttonId" to buttonId,
