@@ -108,12 +108,9 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             MotionEvent.BUTTON_PRIMARY -> 1  // 左键
             MotionEvent.BUTTON_SECONDARY -> 3  // 右键
             MotionEvent.BUTTON_TERTIARY -> 2  // 中键
+            //Android TV 鼠标右键
+            MotionEvent.BUTTON_BACK -> 3
             else -> event.actionButton
-          }
-          if (isAndroidTV && event.actionButton == MotionEvent.BUTTON_BACK) {
-            // For Android TV, mouse right click is recognized as BUTTON_BACK.
-            // It is already handled in registerLockedKeyEventHandler.
-            return@setOnCapturedPointerListener true
           }
           channel.invokeMethod("onCursorButton", mapOf(
             "buttonId" to buttonId,
@@ -127,12 +124,9 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
             MotionEvent.BUTTON_PRIMARY -> 1  // 左键
             MotionEvent.BUTTON_SECONDARY -> 3  // 右键
             MotionEvent.BUTTON_TERTIARY -> 2  // 中键
+            //Android TV 鼠标右键
+            MotionEvent.BUTTON_BACK -> 3
             else -> event.actionButton
-          }
-          if (isAndroidTV && event.actionButton == MotionEvent.BUTTON_BACK) {
-            // For Android TV, mouse right click is recognized as BUTTON_BACK.
-            // It is already handled in registerLockedKeyEventHandler.
-            return@setOnCapturedPointerListener true
           }
           channel.invokeMethod("onCursorButton", mapOf(
             "buttonId" to buttonId,
@@ -187,15 +181,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       if (isAndroidTV && event.source and InputDevice.SOURCE_KEYBOARD != InputDevice.SOURCE_KEYBOARD) {
         // mouse right button
         if (event.keyCode == 4) {
-          val isDown = when (event.action) {
-            KeyEvent.ACTION_DOWN -> true
-            KeyEvent.ACTION_UP -> false
-            else -> false
-          }
-          channel.invokeMethod("onCursorButton", mapOf(
-            "buttonId" to 3,
-            "isDown" to isDown
-          ))
+          // block quitting app
           return@registerLockedKeyEventHandler true
         }
       }
