@@ -65,6 +65,11 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
 
   @RequiresApi(Build.VERSION_CODES.O)
   private fun lockCursor() {
+    if (isCursorLocked) return;
+    isCursorLocked = true;
+    flutterView = activity?.window?.decorView?.findViewById<View>(android.R.id.content)
+    flutterView?.isFocusable = true
+    flutterView?.isFocusableInTouchMode = true
     flutterView?.let { view ->
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         //view.isFocusable = true
@@ -72,9 +77,6 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         view.requestPointerCapture()
       }
     }
-    if (isCursorLocked) return;
-    isCursorLocked = true;
-    flutterView = activity?.window?.decorView?.findViewById<View>(android.R.id.content)
     flutterView?.setOnCapturedPointerListener { _, event ->
       when (event.actionMasked) {
         MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
@@ -141,12 +143,15 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   }
 
   private fun unlockCursor() {
+    if (!isCursorLocked) return;
     flutterView?.let { view ->
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         view.releasePointerCapture()
         isCursorLocked = false
       }
     }
+    flutterView?.isFocusable = false
+    flutterView?.isFocusableInTouchMode = false
   }
 
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -190,8 +195,9 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
     flutterView = binding.activity.window.decorView.findViewById<View>(android.R.id.content)
     
     // 设置视图可聚焦 不设置无法移动
-    flutterView?.isFocusable = true
-    flutterView?.isFocusableInTouchMode = true
+    //这两个只要设置一个 安卓TV Dpad就无法正常工作
+    //flutterView?.isFocusable = true
+    //flutterView?.isFocusableInTouchMode = true
     
     // 设置捕获指针监听器，处理所有类型的事件
 
