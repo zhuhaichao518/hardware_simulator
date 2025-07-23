@@ -1,11 +1,12 @@
 package com.cloudplayplus.hardware_simulator
 
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.os.Build
 import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
-import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -15,7 +16,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import org.flame_engine.gamepads_android.GamepadsCompatibleActivity
-import android.view.KeyEvent
 
 /** HardwareSimulatorPlugin */
 class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -26,6 +26,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   private lateinit var channel : MethodChannel
   private var activity: Activity? = null
   private var isCursorLocked = false
+  private var isAndroidTV = false
   private var flutterView: View? = null
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -165,6 +166,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
   @RequiresApi(Build.VERSION_CODES.O)
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
+    isAndroidTV = activity!!.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
     val compatibleActivity = activity as GamepadsCompatibleActivity
     compatibleActivity.registerLockedKeyEventHandler { event ->
@@ -172,9 +174,59 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
         return@registerLockedKeyEventHandler false
       }
       val device = InputDevice.getDevice(event.deviceId)
+      if (isAndroidTV && event.source and InputDevice.SOURCE_KEYBOARD != InputDevice.SOURCE_KEYBOARD) {
+        // mouse right button
+        if (event.keyCode == 4) {
+          val isDown = when (event.action) {
+            KeyEvent.ACTION_DOWN -> true
+            KeyEvent.ACTION_UP -> false
+            else -> false
+          }
+          channel.invokeMethod("onCursorButton", mapOf(
+            "buttonId" to 3,
+            "isDown" to isDown
+          ))
+          return@registerLockedKeyEventHandler true
+        }
+      }
       if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
         // 这是键盘事件
+        if (isAndroidTV && event.keyCode == KeyEvent.KEYCODE_MENU) {
+          val isDown = when (event.action) {
+            KeyEvent.ACTION_DOWN -> true
+            KeyEvent.ACTION_UP -> false
+            else -> false
+          }
+          channel.invokeMethod("onCursorButton", mapOf(
+            "buttonId" to 3,
+            "isDown" to isDown
+          ))
+        }
         if (isDpadKey(event.keyCode) ) {
+          if (isAndroidTV) {
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+              //mouse left or middle button
+              if (event.scanCode == 0) {
+                // We don't need to invoke for android TV.
+                /*channel.invokeMethod("onCursorButton", mapOf(
+                  "buttonId" to 2/*right button id*/,
+                  "isDown" to isDown
+                ))*/
+              } else {
+                //DPad OK button
+                channel.invokeMethod("onKeyboardButton", mapOf(
+                  //enter key for android
+                  "buttonId" to 66,
+                  "isDown" to isDown
+                ))
+              }
+            }
+          }
           return@registerLockedKeyEventHandler true
         }
         val isDown = when (event.action) {
