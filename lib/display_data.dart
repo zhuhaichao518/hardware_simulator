@@ -27,12 +27,12 @@ class DisplayData {
       index: map['index'] ?? 0,
       width: map['width'] ?? 1920,
       height: map['height'] ?? 1080,
-      refreshRate: map['refreshRate'] ?? 60,  // 匹配C++端的字段名
-      isVirtual: map['isVirtual'] ?? false,   // 匹配C++端的字段名
-      displayName: map['displayName'] ?? '',  // 匹配C++端的字段名
-      deviceName: map['deviceName'] ?? '',    // 匹配C++端的字段名
+      refreshRate: map['refreshRate'] ?? 60,  
+      isVirtual: map['isVirtual'] ?? false,  
+      displayName: map['displayName'] ?? '',  
+      deviceName: map['deviceName'] ?? '',   
       active: map['active'] ?? true,
-      displayUid: map['displayUid'] ?? 0,     // 匹配C++端的字段名
+      displayUid: map['displayUid'] ?? 0,    
     );
   }
 }

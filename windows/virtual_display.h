@@ -18,35 +18,30 @@ public:
 
     struct DisplayInfo {
         bool   active        = false;
-        int    displayUid       = 0;       // ParseDisplayAddress
-        std::string deviceName;         // "\\\\.\\DISPLAYn"
-        std::string displayName; 
-        std::string deviceDescription;   
-        FILETIME lastArrival;
+        bool   is_virtual    = false;  // Whether this is a virtual display
+        int    display_uid   = 0;       // Display unique identifier  
+        std::string device_name;         // "\\\\.\\DISPLAYn"
+        std::string display_name; 
+        std::string device_description;   
+        FILETIME last_arrival;
     };
 
 
     VirtualDisplay();
-    VirtualDisplay(const DisplayConfig& config, const DisplayInfo& info, int display_id = -1)
-        : config_(config), info_(info), display_id_(display_id){}
+    VirtualDisplay(const DisplayConfig& config, const DisplayInfo& info, int display_uid = -1)
+        : config_(config), info_(info), display_uid_(display_uid){}
     ~VirtualDisplay();
 
     bool ChangeDisplaySettings(const DisplayConfig& config);
     DisplayConfig GetConfig() const { return config_; }
     DisplayInfo GetDisplayInfo() const { return info_; }
-    int GetDisplayId() const { return display_id_; }
-    void SetDisplayId(int id) { display_id_ = id; }
+    int GetDisplayUid() const { return display_uid_; }
+    void SetDisplayUid(int uid) { display_uid_ = uid; }
 
 private:
     DisplayConfig config_;
     DisplayInfo info_;
-    int display_id_;
-    
-    bool FindParsecDisplay(char* deviceName, int bufferSize);
-
-    //debug
-    static void DumpAllDisplays();
-    static DISPLAY_DEVICEW MakeDisplayDevice();
+    int display_uid_;
 
     VirtualDisplay(const VirtualDisplay&) = delete;
     VirtualDisplay& operator=(const VirtualDisplay&) = delete;

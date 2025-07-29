@@ -305,9 +305,9 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<bool> removeDisplay(int displayId) async {
+  Future<bool> removeDisplay(int displayUid) async {
     return await methodChannel.invokeMethod('removeDisplay', {
-      'displayId': displayId,
+      'displayUid': displayUid,
     });
   }
 
@@ -330,9 +330,9 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<bool> changeDisplaySettings(int index, int width, int height, int refreshRate, {int? bitDepth}) async {
+  Future<bool> changeDisplaySettings(int displayUid, int width, int height, int refreshRate, {int? bitDepth}) async {
     final Map<String, dynamic> arguments = {
-      'index': index,
+      'displayUid': displayUid,
       'width': width,
       'height': height,
       'refreshRate': refreshRate,

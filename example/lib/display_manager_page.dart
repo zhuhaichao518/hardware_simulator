@@ -38,6 +38,13 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
 
         List<DisplayData> displayList = await HardwareSimulator.getDisplayList();
         displays = displayList;
+        //log the loaded displays
+        print('Loaded displays: ${displays.length}');
+        for (var display in displays) {
+          //print display all details
+          print('Display ID: ${display.index}, Resolution: ${display.width}x${display.height}, Refresh Rate: ${display.refreshRate}Hz'
+          ', Virtual: ${display.isVirtual}, Name: ${display.displayName}, Device: ${display.deviceName}, Active: ${display.active}, UID: ${display.displayUid}');
+        }
 
     } catch (e) {
       print('Error loading displays: $e');
@@ -216,14 +223,14 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
       int height = int.parse(resolutionParts[1]);
       
       bool success = await HardwareSimulator.changeDisplaySettings(
-        display.index,
+        display.displayUid,
         width,
         height,
         refreshRate,
       );
       
       if (success) {
-        print('显示器设置修改成功: ${display.index} -> ${width}x${height}@${refreshRate}Hz');
+        print('显示器设置修改成功: ${display.displayUid} -> ${width}x${height}@${refreshRate}Hz');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('显示器设置修改成功')),
         );
@@ -324,7 +331,7 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                     SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: _createCustomDisplay,
-                      child: Text('创建自定义显示器 (${_selectedResolution}@${_selectedRefreshRate}Hz)'),
+                      child: Text('创建自定义显示器 (${_selectedResolution}@${_selectedRefreshRate}Hz) (update bug)'),
                     ),
                   ],
                 ),

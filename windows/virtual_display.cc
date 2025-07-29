@@ -13,13 +13,9 @@
 #include <devpkey.h>    // DEVPKEY_Device_*
 
 
-VirtualDisplay::VirtualDisplay() : display_id_(-1) {
+VirtualDisplay::VirtualDisplay() : display_uid_(-1) {
     std::cout << "VirtualDisplay created" << std::endl;
     config_ = DisplayConfig();
-    //DumpAllDisplays();
-    std::cout << " ----------------------------------------------------- xxx ----------------" << std::endl;
-    //GetAllDisplays();
-     std::cout << " ----------------------------------------------------- xxx ----------------" << std::endl;
 }
 
 VirtualDisplay::~VirtualDisplay() {
@@ -35,15 +31,8 @@ bool VirtualDisplay::ChangeDisplaySettings(const DisplayConfig& config) {
     dm.dmDisplayFrequency = config.refresh_rate;    
     dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
     
-    std::wstring wDeviceName(info_.deviceName.begin(), info_.deviceName.end());
+    std::wstring wDeviceName(info_.device_name.begin(), info_.device_name.end());
     LONG result = ChangeDisplaySettingsExW(wDeviceName.c_str(), 
                                            &dm, NULL, CDS_UPDATEREGISTRY, NULL);
-    
     return (result == DISP_CHANGE_SUCCESSFUL);
-}
-
-DISPLAY_DEVICEW VirtualDisplay::MakeDisplayDevice() {
-    DISPLAY_DEVICEW dd{};
-    dd.cb = sizeof(dd);
-    return dd;
 }

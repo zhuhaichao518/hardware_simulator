@@ -14,7 +14,7 @@ public:
     static void Shutdown();
     static int AddDisplay();
     static int AddDisplay(int width, int height, int refresh_rate = 60);
-    static bool RemoveDisplay(int display_index);
+    static bool RemoveDisplay(int display_uid);
 
     static int GetDisplayCount();
     static std::vector<int> GetDisplayList();
@@ -24,7 +24,7 @@ public:
     
     static bool CheckVddStatus();
     static int GetAllDisplays();
-    static bool ChangeDisplaySettings(int display_index, const VirtualDisplay::DisplayConfig& config);
+    static bool ChangeDisplaySettings(int display_uid, const VirtualDisplay::DisplayConfig& config);
 
 
     // Detailed display information structure
@@ -49,7 +49,6 @@ public:
         
         // Additional fields
         bool is_virtual = false;       // Whether this is a virtual display
-        int display_id = -1;          // Internal display ID (-1 if not managed)
     };
     static std::vector<DetailedDisplayInfo> GetDetailedDisplayList();
 

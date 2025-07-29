@@ -90,7 +90,6 @@ static int ParseDisplayAddress(const std::string& path) {
         if (endPos > 0) {
             try {
                 std::string numberStr = uidStr.substr(0, endPos);
-                std::cout << "ParseDisplayAddress: Found UID number: " << numberStr << " in path: " << path << std::endl;
                 return std::stoi(numberStr);
             } catch(const std::exception& e) {
                 std::cout << "ParseDisplayAddress: Error parsing number: " << e.what() << std::endl;
@@ -98,7 +97,6 @@ static int ParseDisplayAddress(const std::string& path) {
         }
     }
     
-    std::cout << "ParseDisplayAddress: No UID found in path: " << path << std::endl;
     return 0;
 }
 
@@ -115,27 +113,26 @@ static std::string ParseDisplayCode(const std::string& id) {
     return tok.size() >= 2 ? tok[1] : tok[0];
 }
 
-static bool GetDeviceInstance(const std::string& deviceId, DEVINST& devInst) {
-    std::wstring wDeviceId = StringToWideString(deviceId);
+static bool GetDeviceInstance(const std::string& deviceId, DEVINST& dev_inst) {
+    std::wstring w_device_id = StringToWideString(deviceId);
 
     CONFIGRET cr = CM_Locate_DevNodeW(
-        &devInst,
-        const_cast<wchar_t*>(wDeviceId.c_str()),
+        &dev_inst,
+        const_cast<wchar_t*>(w_device_id.c_str()),
         0
     );
     
-    std::cout << "CM_Locate_DevNodeW result: cr = " << cr << " for deviceId: " << WideStringToString(wDeviceId) << std::endl;
     return (cr == CR_SUCCESS);
 }
 
-static bool GetDeviceLastArrival(DEVINST devInst, FILETIME& lastArrival) {
+static bool GetDeviceLastArrival(DEVINST dev_inst, FILETIME& last_arrival) {
     DEVPROPKEY key = DEVPKEY_Device_LastArrivalDate;
     DEVPROPTYPE propType;
     LONGLONG fileTimeValue;
     ULONG bufferSize = sizeof(LONGLONG);
 
     CONFIGRET cr = CM_Get_DevNode_PropertyW(
-        devInst,
+        dev_inst,
         &key,
         &propType,
         reinterpret_cast<PBYTE>(&fileTimeValue),
@@ -143,51 +140,47 @@ static bool GetDeviceLastArrival(DEVINST devInst, FILETIME& lastArrival) {
         0
     );
     
-    std::cout << "GetDeviceLastArrival: CONFIGRET = " << cr << ", propType = " << propType << std::endl;
-    
     if (cr == CR_SUCCESS) {
-        std::cout << "FileTimeValue: " << fileTimeValue << std::endl;
-        lastArrival.dwLowDateTime = (DWORD)(fileTimeValue & 0xFFFFFFFF);
-        lastArrival.dwHighDateTime = (DWORD)(fileTimeValue >> 32);
-        std::cout << "FILETIME: Low=" << lastArrival.dwLowDateTime << ", High=" << lastArrival.dwHighDateTime << std::endl;
+        last_arrival.dwLowDateTime = (DWORD)(fileTimeValue & 0xFFFFFFFF);
+        last_arrival.dwHighDateTime = (DWORD)(fileTimeValue >> 32);
         return true;
     }
     
-    lastArrival.dwLowDateTime = 0;
-    lastArrival.dwHighDateTime = 0;
+    last_arrival.dwLowDateTime = 0;
+    last_arrival.dwHighDateTime = 0;
     return false;
 }
 
-static bool GetParentDeviceInstance(DEVINST devInst, DEVINST& parentInst, std::string& parentId) {
+static bool GetParentDeviceInstance(DEVINST dev_inst, DEVINST& parent_inst, std::string& parent_id) {
     CONFIGRET cr = CM_Get_Parent(
-        &parentInst,
-        devInst,
+        &parent_inst,
+        dev_inst,
         0
     );
     if (cr != CR_SUCCESS) return false;
 
     wchar_t idBuffer[MAX_DEVICE_ID_LEN] = {0};
     cr = CM_Get_Device_IDW(
-        parentInst,
+        parent_inst,
         idBuffer,
         MAX_DEVICE_ID_LEN,
         0
     );
     if (cr != CR_SUCCESS) return false;
 
-    std::wstring wParentId(idBuffer);
-    parentId = WideStringToString(wParentId);
+    std::wstring w_parent_id(idBuffer);
+    parent_id = WideStringToString(w_parent_id);
     return true;
 }
 
-static bool GetDeviceDescription(DEVINST devInst, std::string& description) {
+static bool GetDeviceDescription(DEVINST dev_inst, std::string& description) {
     DEVPROPKEY key = DEVPKEY_Device_DeviceDesc;
     DEVPROPTYPE propType;
     wchar_t buffer[256] = {0};
     ULONG bufferSize = sizeof(buffer);
 
     CONFIGRET cr = CM_Get_DevNode_PropertyW(
-        devInst,
+        dev_inst,
         &key,
         &propType,
         reinterpret_cast<PBYTE>(buffer),
@@ -196,7 +189,8 @@ static bool GetDeviceDescription(DEVINST devInst, std::string& description) {
     );
     
     if (cr == CR_SUCCESS && propType == DEVPROP_TYPE_STRING) {
-        description = WideStringToString(std::wstring(buffer));
+        std::wstring wDescription(buffer);
+        description = WideStringToString(wDescription);
         return true;
     }
     
@@ -288,7 +282,7 @@ void VirtualDisplayControl::Shutdown() {
     }
     
     for (auto& display : displays_) {
-        parsec_vdd::VddRemoveDisplay(vdd_handle_, display->GetDisplayId());
+        parsec_vdd::VddRemoveDisplay(vdd_handle_, display->GetDisplayUid());
     }
     
     if (vdd_handle_ != INVALID_HANDLE_VALUE) {
@@ -310,8 +304,8 @@ int VirtualDisplayControl::AddDisplay() {
     int vdd_index = parsec_vdd::VddAddDisplay(vdd_handle_);
     if (vdd_index >= 0) {
         std::cout << "Virtual display added: " << vdd_index << std::endl;
-        int nowCount = VirtualDisplayControl::GetAllDisplays();
-        return nowCount;
+        std::ignore = VirtualDisplayControl::GetAllDisplays();
+        return vdd_index;
     } else {
         std::cout << "Error: Failed to add display to VDD" << std::endl;
         return -1;
@@ -327,11 +321,41 @@ int VirtualDisplayControl::AddDisplay(int width, int height, int refresh_rate) {
     int vdd_index = parsec_vdd::VddAddDisplay(vdd_handle_);
     if (vdd_index >= 0) {
         std::cout << "Virtual display added with config: " << vdd_index << std::endl;
-        int nowCount = VirtualDisplayControl::GetAllDisplays();
 
-        VirtualDisplay::DisplayConfig config(width, height, refresh_rate);     
-        displays_[nowCount-1]->ChangeDisplaySettings(config);
-        
+        //notification
+        std::thread([vdd_index, width, height, refresh_rate]() {
+            const int max_attempts = 5;  
+            const int sleep_ms = 20;
+            
+            std::cout << "Starting async configuration for display " << vdd_index << std::endl;
+            
+            for (int attempt = 0; attempt < max_attempts; ++attempt) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+                
+                int display_count = VirtualDisplayControl::GetAllDisplays();
+                std::cout << "Async attempt " << (attempt + 1) << ": Found " << display_count << " displays" << std::endl;
+                
+                auto it = std::find_if(displays_.begin(), displays_.end(),
+                    [vdd_index](const std::unique_ptr<VirtualDisplay>& display) {
+                        return display->GetDisplayUid() == vdd_index;
+                    });
+
+                if (it != displays_.end()) {
+                    std::cout << "Async: Found new display " << vdd_index << " after " << ((attempt + 1) * sleep_ms) << "ms" << std::endl;
+                    
+                    VirtualDisplay::DisplayConfig config(width, height, refresh_rate);
+                    if ((*it)->ChangeDisplaySettings(config)) {
+                        std::cout << "Async: Successfully applied display settings to " << vdd_index << std::endl;
+                    } else {
+                        std::cout << "Async: Failed to apply display settings to " << vdd_index << std::endl;
+                    }
+                    return;
+                }
+            }
+            
+            std::cout << "Async: Timeout waiting for new display " << vdd_index << " after " << (max_attempts * sleep_ms) << "ms" << std::endl;
+        }).detach();
+
         return vdd_index;
     } else {
         std::cout << "Error: Failed to add display to VDD" << std::endl;
@@ -340,27 +364,32 @@ int VirtualDisplayControl::AddDisplay(int width, int height, int refresh_rate) {
 }
 
 //async issue
-bool VirtualDisplayControl::RemoveDisplay(int display_id) {
+bool VirtualDisplayControl::RemoveDisplay(int display_uid) {
     if (!initialized_ || vdd_handle_ == INVALID_HANDLE_VALUE) {
         std::cout << "Error: VirtualDisplayControl not initialized" << std::endl;
         return false;
     }
 
-    std::cout << "get remove call with id" << display_id << std::endl;
+    std::cout << "get remove call with id" << display_uid << std::endl;
     
     auto it = std::find_if(displays_.begin(), displays_.end(), 
-        [display_id](const std::unique_ptr<VirtualDisplay>& display) {
-            return display->GetDisplayId() == display_id;
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display->GetDisplayUid() == display_uid;
         });
     
     if (it == displays_.end()) {
         std::cout << "Error: Display not found" << std::endl;
         return false;
     }
+
+    if(it->get()->GetDisplayInfo().is_virtual == false) {
+        std::cout << "Error: Cannot remove non-virtual display" << std::endl;
+        return false;
+    }
     
-    parsec_vdd::VddRemoveDisplay(vdd_handle_, display_id);
+    parsec_vdd::VddRemoveDisplay(vdd_handle_, display_uid);
     displays_.erase(it);
-    std::cout << "Virtual display removed: " << display_id << std::endl;
+    std::cout << "Virtual display removed: " << display_uid << std::endl;
     return true;
 }
 
@@ -371,7 +400,7 @@ int VirtualDisplayControl::GetDisplayCount() {
 std::vector<int> VirtualDisplayControl::GetDisplayList() {
     std::vector<int> ids;
     for (const auto& display : displays_) {
-        ids.push_back(display->GetDisplayId());
+        ids.push_back(display->GetDisplayUid());
     }
     return ids;
 }
@@ -386,10 +415,10 @@ int VirtualDisplayControl::GetAllDisplays() {
 
     for (int ai = 0; EnumDisplayDevicesW(nullptr, ai, &ddAdapter, 0); ++ai) {
 
-        std::cout << "__________________________________________---_______________________________" << std::endl;
-        std::cout << "Processing adapter: " << WideStringToString(ddAdapter.DeviceName) << "\n";
-        std::cout << "StateFlags: " << ddAdapter.StateFlags << "\n";
-        std::cout << "DeviceID: " << WideStringToString(ddAdapter.DeviceID) << "\n";
+        // std::cout << "__________________________________________---_______________________________" << std::endl;
+        // std::cout << "Processing adapter: " << WideStringToString(ddAdapter.DeviceName) << "\n";
+        // std::cout << "StateFlags: " << ddAdapter.StateFlags << "\n";
+        // std::cout << "DeviceID: " << WideStringToString(ddAdapter.DeviceID) << "\n";
 
 
 
@@ -399,53 +428,57 @@ int VirtualDisplayControl::GetAllDisplays() {
                                  EDD_GET_DEVICE_INTERFACE_NAME);
              ++mi)
         {
-            std::cout << "__________________________________________--display-_______________________________" << std::endl;
-            std::cout << "Processing monitor: " << WideStringToString(ddMonitor.DeviceName) << "\n";
-            std::cout << "StateFlags: " << ddMonitor.StateFlags << "\n";
-            std::cout << "DeviceID: " << WideStringToString(ddMonitor.DeviceID) << "\n";
+            // std::cout << "__________________________________________--display-_______________________________" << std::endl;
+            // std::cout << "Processing monitor: " << WideStringToString(ddMonitor.DeviceName) << "\n";
+            // std::cout << "StateFlags: " << ddMonitor.StateFlags << "\n";
+            // std::cout << "DeviceID: " << WideStringToString(ddMonitor.DeviceID) << "\n";
 
 
             if (!(ddMonitor.StateFlags & DISPLAY_DEVICE_ATTACHED))
                 continue;
 
-            int pathIdx = -1;
+            int path_idx = -1;
+            std::string devicePath;
             for (int k = 0; k < (int)paths.size(); ++k) {
                 std::string p = paths[k];
                 std::replace(p.begin(), p.end(), '\\', '#');
-                std::wstring wDeviceId(ddMonitor.DeviceID);
-                std::string deviceId = WideStringToString(wDeviceId);
-                if (deviceId.find(p) != std::string::npos) {
-                    pathIdx = k;
+                std::wstring w_device_id(ddMonitor.DeviceID);
+                std::string device_id = WideStringToString(w_device_id);
+                if (device_id.find(p) != std::string::npos) {
+                    path_idx = k;
+                    devicePath = paths[k];
                     break;
                 }
             }
-            if (pathIdx < 0) 
+            if (path_idx < 0) 
                 continue;
 
-            const std::string devicePath = paths[pathIdx];
 
-            std::wstring wAdapterDeviceId(ddAdapter.DeviceID);
-            std::string adapterDeviceId = WideStringToString(wAdapterDeviceId);
-            if (adapterDeviceId.compare(parsec_vdd::VDD_DISPLAY_ID) == 0) {
-                continue;
-            }
             if (!displayMap.count(devicePath)) {
 
-                VirtualDisplay::DisplayInfo d;
-                d.active      = !!(ddMonitor.StateFlags & DISPLAY_DEVICE_ACTIVE);
-                d.displayUid     = ParseDisplayAddress(devicePath);
-                std::wstring wDeviceName(ddAdapter.DeviceName);
-                d.deviceName  = WideStringToString(wDeviceName);
-                std::wstring wDeviceId(ddMonitor.DeviceID);
-                std::string deviceId = WideStringToString(wDeviceId);
-                d.displayName = ParseDisplayCode(deviceId);
+                std::wstring w_device_id(ddMonitor.DeviceID);
+                std::string device_id = WideStringToString(w_device_id);
 
-                DEVINST devInst;
-                if (GetDeviceInstance(devicePath, devInst)) {
-                    GetDeviceLastArrival(devInst, d.lastArrival);
-                    GetDeviceDescription(devInst, d.deviceDescription);
+                VirtualDisplay::DisplayInfo d;
+                d.display_uid     = ParseDisplayAddress(devicePath);
+
+                if (ParseDisplayCode(device_id).compare(parsec_vdd::VDD_DISPLAY_ID) == 0) {
+                    d.is_virtual = true;
+                } else {
+                    d.is_virtual = false;
+                }
+
+                d.active      = !!(ddMonitor.StateFlags & DISPLAY_DEVICE_ACTIVE);
+                std::wstring w_device_name(ddAdapter.DeviceName);
+                d.device_name  = WideStringToString(w_device_name);
+                d.display_name = ParseDisplayCode(device_id);
+
+                DEVINST dev_inst;
+                if (GetDeviceInstance(devicePath, dev_inst)) {
+                    GetDeviceLastArrival(dev_inst, d.last_arrival);
+                    GetDeviceDescription(dev_inst, d.device_description);
                 }else{
-                    std::cout << "Failed to get device instance for: " << deviceId << "\n";
+                    std::cout << "Failed to get device instance for: " << device_id << "\n";
                 }
 
 
@@ -460,26 +493,30 @@ int VirtualDisplayControl::GetAllDisplays() {
                     config.bit_depth = dm.dmBitsPerPel;
                 } 
 
-               
-                std::cout << "=== This is display  ------------------ ===\n";
-                std::cout << "  Display ID: " << d.displayUid << "\n";
-                std::cout << "  Device Name: " << d.deviceName << "\n";
-                std::cout << "  Display Name: " << d.displayName << "\n";
-                std::cout << "  Device Description: " << d.deviceDescription << "\n";
-                std::cout << "  Last Arrival: " << FileTimeToString(d.lastArrival) << "\n";
-                std::cout << "  Active: " << (d.active ? "Yes" : "No") << "\n";
-
-                std::cout << "  Display Config: " 
-                          << config.width << "x" 
-                          << config.height << "@" 
-                          << config.refresh_rate << "Hz, "
-                          << config.bit_depth << " bits\n";
-                std::cout << "=== End ===\n";
-                
                 std::unique_ptr<VirtualDisplay> display = std::make_unique<VirtualDisplay>(config, d);
-                display->SetDisplayId(d.displayUid - 256);
+                if(d.is_virtual) {
+                    display->SetDisplayUid(d.display_uid - 256);
+                } else { 
+                    display->SetDisplayUid(d.display_uid);
+                }
+
                 displayMap[devicePath] = std::move(display);
-                paths.erase(paths.begin() + pathIdx);
+               
+                // std::cout << "=== This is display  ------------------ ===\n";
+                // std::cout << "  Display ID: " << d.display_uid << "\n";
+                // std::cout << "  Device Name: " << d.device_name << "\n";
+                // std::cout << "  Display Name: " << d.display_name << "\n";
+                // std::cout << "  Device Description: " << d.device_description << "\n";
+                // std::cout << "  Last Arrival: " << FileTimeToString(d.last_arrival) << "\n";
+                // std::cout << "  Active: " << (d.active ? "Yes" : "No") << "\n";
+
+                // std::cout << "  Display Config: " 
+                //           << config.width << "x" 
+                //           << config.height << "@" 
+                //           << config.refresh_rate << "Hz, "
+                //           << config.bit_depth << " bits\n";
+                // std::cout << "=== End ===\n";
+        
             }
         }
     }
@@ -494,8 +531,8 @@ int VirtualDisplayControl::GetAllDisplays() {
 
     std::sort(sortedDisplays.begin(), sortedDisplays.end(), 
         [](const auto& a, const auto& b) {
-            const FILETIME& ftA = a.second->GetDisplayInfo().lastArrival;
-            const FILETIME& ftB = b.second->GetDisplayInfo().lastArrival;
+            const FILETIME& ftA = a.second->GetDisplayInfo().last_arrival;
+            const FILETIME& ftB = b.second->GetDisplayInfo().last_arrival;
             
 
             ULARGE_INTEGER uliA, uliB;
@@ -521,13 +558,18 @@ bool VirtualDisplayControl::CheckVddStatus() {
     return (status == parsec_vdd::DEVICE_OK);
 }
 
-bool VirtualDisplayControl::ChangeDisplaySettings(int display_index, const VirtualDisplay::DisplayConfig& config) {
-    if (display_index < 0 || display_index >= static_cast<int>(displays_.size())) {
-        std::cout << "Error: Invalid display index" << std::endl;
+bool VirtualDisplayControl::ChangeDisplaySettings(int display_uid, const VirtualDisplay::DisplayConfig& config) {
+    auto it = std::find_if(displays_.begin(), displays_.end(),
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display && display->GetDisplayUid() == display_uid;
+        });
+
+    if (it == displays_.end()) {
+        std::cout << "Error: Invalid display UID:" << display_uid << std::endl;
         return false;
     }
-    
-    auto& display = displays_[display_index];
+
+    auto& display = *it;
     if (!display) {
         std::cout << "Error: Display not found" << std::endl;
         return false;
@@ -537,18 +579,15 @@ bool VirtualDisplayControl::ChangeDisplaySettings(int display_index, const Virtu
         std::cout << "Error: Failed to change display settings" << std::endl;
         return false;
     }
-    
-    std::cout << "Display settings changed for index: " << display_index << std::endl;
+
+    std::cout << "Display settings changed for UID: " << display_uid << std::endl;
     return true;
 }
 
 
 std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::GetDetailedDisplayList() {
-    std::cout << "=== GetDetailedDisplayList called ===" << std::endl;
     std::vector<DetailedDisplayInfo> result;
     VirtualDisplayControl::GetAllDisplays();
-    
-    std::cout << "Total managed displays: " << displays_.size() << std::endl;
     
     // First, add all managed virtual displays from displays_ array
     for (size_t i = 0; i < displays_.size(); i++) {
@@ -565,25 +604,25 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
             info.bit_depth = config.bit_depth;
             
             // Copy display info data
-            auto displayInfo = display->GetDisplayInfo();
-            info.active = displayInfo.active;
-            info.display_uid = display->GetDisplayId();
-            info.device_name = displayInfo.deviceName;
-            info.display_name = displayInfo.displayName;
-            info.device_description = displayInfo.deviceDescription;
-            info.last_arrival = displayInfo.lastArrival;
+            auto display_info = display->GetDisplayInfo();
+            info.active = display_info.active;
+            info.display_uid = display->GetDisplayUid();
+            info.device_name = display_info.device_name;
+            info.display_name = display_info.display_name;
+            info.device_description = display_info.device_description;
+            info.last_arrival = display_info.last_arrival;
             
             // Set additional fields
-            info.is_virtual = true;  // These are managed virtual displays
-            info.display_id = display->GetDisplayId();
+            info.is_virtual = display_info.is_virtual;  // These are managed virtual displays
+
             
-            std::cout << "Display[" << i << "]:" << std::endl;
-            std::cout << "  Resolution: " << info.width << "x" << info.height << "@" << info.refresh_rate << "Hz" << std::endl;
-            std::cout << "  Display ID: " << info.display_id << std::endl;
-            std::cout << "  Device Name: " << info.device_name << std::endl;
-            std::cout << "  Display Name: " << info.display_name << std::endl;
-            std::cout << "  Active: " << (info.active ? "Yes" : "No") << std::endl;
-            std::cout << "  Is Virtual: " << (info.is_virtual ? "Yes" : "No") << std::endl;
+            // std::cout << "Display[" << i << "]:" << std::endl;
+            // std::cout << "  Resolution: " << info.width << "x" << info.height << "@" << info.refresh_rate << "Hz" << std::endl;
+            // std::cout << "  Display UID: " << info.display_uid << std::endl;
+            // std::cout << "  Device Name: " << info.device_name << std::endl;
+            // std::cout << "  Display Name: " << info.display_name << std::endl;
+            // std::cout << "  Active: " << (info.active ? "Yes" : "No") << std::endl;
+            // std::cout << "  Is Virtual: " << (info.is_virtual ? "Yes" : "No") << std::endl;
             
             result.push_back(info);
         } else {
@@ -592,7 +631,6 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
     }
 
     std::cout << "Returning " << result.size() << " displays" << std::endl;
-    std::cout << "=== GetDetailedDisplayList end ===" << std::endl;
     return result;
 }
 

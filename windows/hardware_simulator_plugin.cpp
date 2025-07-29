@@ -953,9 +953,18 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      }
   } else if (method_call.method_name().compare("createDisplayWithConfig") == 0) {
      if (VirtualDisplayControl::IsInitialized()) {
-         auto width = (args->find(flutter::EncodableValue("width")))->second;
-         auto height = (args->find(flutter::EncodableValue("height")))->second;
-         auto refreshRate = (args->find(flutter::EncodableValue("refreshRate")))->second;
+         auto width_iter = args->find(flutter::EncodableValue("width"));
+         auto height_iter = args->find(flutter::EncodableValue("height"));
+         auto refreshRate_iter = args->find(flutter::EncodableValue("refreshRate"));
+         
+         if (width_iter == args->end() || height_iter == args->end() || refreshRate_iter == args->end()) {
+             result->Error("MISSING_ARGUMENT", "Missing width, height, or refreshRate arguments");
+             return;
+         }
+         
+         auto width = width_iter->second;
+         auto height = height_iter->second;
+         auto refreshRate = refreshRate_iter->second;
          
          int displayId = VirtualDisplayControl::AddDisplay(
              static_cast<int>(std::get<int>(width)),
@@ -972,7 +981,12 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
   } else if (method_call.method_name().compare("removeDisplay") == 0) {
-     auto displayId = (args->find(flutter::EncodableValue("displayId")))->second;
+     auto displayId_iter = args->find(flutter::EncodableValue("displayUid"));
+     if (displayId_iter == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
+         return;
+     }
+     auto displayId = displayId_iter->second;
      if (VirtualDisplayControl::IsInitialized()) {
         VirtualDisplayControl::RemoveDisplay(static_cast<int>(std::get<int>((displayId))));
          result->Success(flutter::EncodableValue(true));
@@ -998,14 +1012,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          displayMap[flutter::EncodableValue("width")] = flutter::EncodableValue(display.width);
          displayMap[flutter::EncodableValue("height")] = flutter::EncodableValue(display.height);
          displayMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(display.refresh_rate);
-         displayMap[flutter::EncodableValue("bitDepth")] = flutter::EncodableValue(display.bit_depth);
          displayMap[flutter::EncodableValue("active")] = flutter::EncodableValue(display.active);
          displayMap[flutter::EncodableValue("displayUid")] = flutter::EncodableValue(display.display_uid);
          displayMap[flutter::EncodableValue("deviceName")] = flutter::EncodableValue(display.device_name);
          displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
-         displayMap[flutter::EncodableValue("deviceDescription")] = flutter::EncodableValue(display.device_description);
          displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
-         displayMap[flutter::EncodableValue("displayId")] = flutter::EncodableValue(display.display_id);
          
          displayList.push_back(flutter::EncodableValue(displayMap));
      }
@@ -1018,15 +1029,15 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          result->Error("INVALID_ARGUMENTS", "Arguments must be a map");
          return;
      }
-     
-     // Get display index
-     auto index_it = arguments->find(flutter::EncodableValue("index"));
-     if (index_it == arguments->end()) {
-         result->Error("MISSING_ARGUMENT", "Missing 'index' argument");
+
+     // Get display uid
+     auto uid_it = arguments->find(flutter::EncodableValue("displayUid"));
+     if (uid_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
          return;
      }
-     int display_index = std::get<int>(index_it->second);
-     
+     int display_uid = std::get<int>(uid_it->second);
+
      // Get new configuration
      auto width_it = arguments->find(flutter::EncodableValue("width"));
      auto height_it = arguments->find(flutter::EncodableValue("height"));
@@ -1048,7 +1059,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          new_config.bit_depth = std::get<int>(bit_depth_it->second);
      }
      
-     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_index, new_config);
+     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_uid, new_config);
      result->Success(flutter::EncodableValue(success));
   } else {
     result->NotImplemented();
