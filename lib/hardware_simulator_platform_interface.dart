@@ -176,10 +176,6 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('createDisplay() has not been implemented.');
   }
 
-  Future<int> createDisplayWithConfig(int width, int height, int refreshRate) {
-    throw UnimplementedError('createDisplayWithConfig() has not been implemented.');
-  }
-
   Future<bool> removeDisplay(int displayUid) {
     throw UnimplementedError('removeDisplay() has not been implemented.');
   }
@@ -194,5 +190,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
 
   Future<bool> changeDisplaySettings(int displayUid, int width, int height, int refreshRate, {int? bitDepth}) {
     throw UnimplementedError('changeDisplaySettings() has not been implemented.');
+  }
+
+  Future<List<Map<String, dynamic>>> getDisplayConfigs(int displayUid) {
+    throw UnimplementedError('getDisplayConfigs() has not been implemented.');
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomDisplayConfigs() {
+    throw UnimplementedError('getCustomDisplayConfigs() has not been implemented.');
+  }
+
+  Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
+    throw UnimplementedError('setCustomDisplayConfigs() has not been implemented.');
   }
 }

@@ -185,10 +185,6 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.createDisplay();
   }
 
-  static Future<int> createDisplayWithConfig(int width, int height, int refreshRate) {
-    return HardwareSimulatorPlatform.instance.createDisplayWithConfig(width, height, refreshRate);
-  }
-
   static Future<bool> removeDisplay(int displayUid) {
     return HardwareSimulatorPlatform.instance.removeDisplay(displayUid);
   }
@@ -203,5 +199,17 @@ class HardwareSimulator {
 
   static Future<bool> changeDisplaySettings(int displayUid, int width, int height, int refreshRate, {int? bitDepth}) {
     return HardwareSimulatorPlatform.instance.changeDisplaySettings(displayUid, width, height, refreshRate, bitDepth: bitDepth);
+  }
+
+  static Future<List<Map<String, dynamic>>> getDisplayConfigs(int displayUid) {
+    return HardwareSimulatorPlatform.instance.getDisplayConfigs(displayUid);
+  }
+
+  static Future<List<Map<String, dynamic>>> getCustomDisplayConfigs() {
+    return HardwareSimulatorPlatform.instance.getCustomDisplayConfigs();
+  }
+
+  static Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
+    return HardwareSimulatorPlatform.instance.setCustomDisplayConfigs(configs);
   }
 }

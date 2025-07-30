@@ -10,23 +10,13 @@ class DisplayManagerPage extends StatefulWidget {
 class _DisplayManagerPageState extends State<DisplayManagerPage> {
   List<DisplayData> displays = [];
   bool isLoading = false;
-  
-  String _selectedResolution = '1920x1080';
-  int _selectedRefreshRate = 60;
-  
-  final List<String> _resolutions = [
-    '1280x720',
-    '1920x1080',
-    '2560x1440', 
-    '3840x2160'
-  ];
-  
-  final List<int> _refreshRates = [24, 30, 60, 144, 240];
+  List<Map<String, dynamic>> customConfigs = [];
 
   @override
   void initState() {
     super.initState();
     _loadDisplays();
+    _loadCustomConfigs();
   }
 
   Future<void> _loadDisplays() async {
@@ -58,6 +48,129 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
     });
   }
 
+  Future<void> _loadCustomConfigs() async {
+    try {
+      final configs = await HardwareSimulator.getCustomDisplayConfigs();
+      setState(() {
+        customConfigs = configs;
+      });
+    } catch (e) {
+      print('Failed to load custom configs: $e');
+    }
+  }
+
+  Future<void> _addCustomConfig() async {
+    String? width;
+    String? height;
+    String? refreshRate;
+    
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Add Custom Display Configuration'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: InputDecoration(labelText: 'Width'),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => width = value,
+              ),
+              TextField(
+                decoration: InputDecoration(labelText: 'Height'),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => height = value,
+              ),
+              TextField(
+                decoration: InputDecoration(labelText: 'Refresh Rate'),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => refreshRate = value,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (width != null && height != null && refreshRate != null) {
+                  try {
+                    int widthInt = int.parse(width!);
+                    int heightInt = int.parse(height!);
+                    int refreshRateInt = int.parse(refreshRate!);
+                    
+                    List<Map<String, dynamic>> newConfigs = List.from(customConfigs);
+                    newConfigs.add({
+                      'width': widthInt,
+                      'height': heightInt,
+                      'refreshRate': refreshRateInt,
+                    });
+                    
+                    bool success = await HardwareSimulator.setCustomDisplayConfigs(newConfigs);
+                    if (success) {
+                      await _loadCustomConfigs();
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Custom configuration added successfully')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to save configuration. Please run as administrator to modify registry.'),
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to add configuration: $e'),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _removeCustomConfig(int index) async {
+    try {
+      List<Map<String, dynamic>> newConfigs = List.from(customConfigs);
+      newConfigs.removeAt(index);
+      
+      bool success = await HardwareSimulator.setCustomDisplayConfigs(newConfigs);
+      if (success) {
+        await _loadCustomConfigs();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Custom configuration removed successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove configuration. Please run as administrator to modify registry.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to remove configuration: $e'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   Future<void> _createDefaultDisplay() async {
     try {
       bool initialized = await HardwareSimulator.initParsecVdd();
@@ -78,39 +191,6 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
       print('Error creating default display: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('创建默认显示器失败: $e')),
-      );
-    }
-  }
-
-  Future<void> _createCustomDisplay() async {
-    try {
-      bool initialized = await HardwareSimulator.initParsecVdd();
-      if (!initialized) {
-        throw Exception('初始化parsec-vdd失败');
-      }
-
-      List<String> resolution = _selectedResolution.split('x');
-      int width = int.parse(resolution[0]);
-      int height = int.parse(resolution[1]);
-      
-      int displayId = await HardwareSimulator.createDisplayWithConfig(
-        width, 
-        height, 
-        _selectedRefreshRate
-      );
-      
-      print('创建自定义显示器成功，ID: $displayId，分辨率: ${width}x$height@${_selectedRefreshRate}Hz');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('创建显示器成功，ID: $displayId')),
-      );
-      
-      // 重新加载显示器列表
-      await _loadDisplays();
-    } catch (e) {
-      print('Error creating custom display: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('创建自定义显示器失败: $e')),
       );
     }
   }
@@ -137,81 +217,132 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
     }
   }
 
-  void _showChangeDisplayDialog(DisplayData display) {
+  void _showChangeDisplayDialog(DisplayData display) async {
+    List<Map<String, dynamic>> availableConfigs = [];
+    
+    try {
+      availableConfigs = await HardwareSimulator.getDisplayConfigs(display.displayUid);
+      print('Available configs for display ${display.displayUid}: ${availableConfigs.length}');
+    } catch (e) {
+      print('Error getting display configs: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('获取显示器配置失败: $e')),
+      );
+      return;
+    }
+
+    if (availableConfigs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('该显示器没有可用的配置选项')),
+      );
+      return;
+    }
+
     String newResolution = '${display.width}x${display.height}';
     int newRefreshRate = display.refreshRate;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('修改显示器 ${display.index}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('当前配置: ${display.width}x${display.height}@${display.refreshRate}Hz'),
-              SizedBox(height: 16),
-              Row(
-                children: [
-                  Text('分辨率: '),
-                  Expanded(
-                    child: DropdownButton<String>(
-                      value: newResolution,
-                      isExpanded: true,
-                      onChanged: (String? value) {
-                        setDialogState(() {
-                          newResolution = value!;
-                        });
-                      },
-                      items: _resolutions.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
+        builder: (context, setDialogState) {
+          // 从可用配置中创建唯一的分辨率列表
+          Set<String> uniqueResolutions = availableConfigs
+              .map((config) => '${config['width']}x${config['height']}')
+              .toSet();
+          List<String> resolutionList = uniqueResolutions.toList()..sort();
+          
+          // 为当前选择的分辨率获取可用的刷新率
+          List<int> availableRefreshRates = availableConfigs
+              .where((config) => '${config['width']}x${config['height']}' == newResolution)
+              .map<int>((config) => config['refreshRate'] as int)
+              .toList()
+              ..sort();
+          
+          // 如果当前刷新率不在可用列表中，选择第一个可用的
+          if (availableRefreshRates.isNotEmpty && !availableRefreshRates.contains(newRefreshRate)) {
+            newRefreshRate = availableRefreshRates.first;
+          }
+          
+          return AlertDialog(
+            title: Text('修改显示器 ${display.index}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('当前配置: ${display.width}x${display.height}@${display.refreshRate}Hz'),
+                SizedBox(height: 16),
+                Text('可用配置数量: ${availableConfigs.length}'),
+                SizedBox(height: 16),
+                Row(
+                  children: [
+                    Text('分辨率: '),
+                    Expanded(
+                      child: DropdownButton<String>(
+                        value: resolutionList.contains(newResolution) ? newResolution : resolutionList.first,
+                        isExpanded: true,
+                        onChanged: (String? value) {
+                          setDialogState(() {
+                            newResolution = value!;
+                            // 更新可用刷新率
+                            List<int> newRefreshRates = availableConfigs
+                                .where((config) => '${config['width']}x${config['height']}' == newResolution)
+                                .map<int>((config) => config['refreshRate'] as int)
+                                .toList()
+                                ..sort();
+                            if (newRefreshRates.isNotEmpty) {
+                              newRefreshRate = newRefreshRates.first;
+                            }
+                          });
+                        },
+                        items: resolutionList.map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text('刷新率: '),
+                    Expanded(
+                      child: DropdownButton<int>(
+                        value: availableRefreshRates.contains(newRefreshRate) ? newRefreshRate : (availableRefreshRates.isNotEmpty ? availableRefreshRates.first : 60),
+                        isExpanded: true,
+                        onChanged: (int? value) {
+                          setDialogState(() {
+                            newRefreshRate = value!;
+                          });
+                        },
+                        items: availableRefreshRates.map<DropdownMenuItem<int>>((int value) {
+                          return DropdownMenuItem<int>(
+                            value: value,
+                            child: Text('${value}Hz'),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('取消'),
               ),
-              SizedBox(height: 8),
-              Row(
-                children: [
-                  Text('刷新率: '),
-                  Expanded(
-                    child: DropdownButton<int>(
-                      value: newRefreshRate,
-                      isExpanded: true,
-                      onChanged: (int? value) {
-                        setDialogState(() {
-                          newRefreshRate = value!;
-                        });
-                      },
-                      items: _refreshRates.map<DropdownMenuItem<int>>((int value) {
-                        return DropdownMenuItem<int>(
-                          value: value,
-                          child: Text('${value}Hz'),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _changeDisplay(display, newResolution, newRefreshRate);
+                },
+                child: Text('确认修改'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _changeDisplay(display, newResolution, newRefreshRate);
-              },
-              child: Text('确认修改'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -290,52 +421,52 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
-                    Text('自定义显示器配置:'),
-                    SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text('分辨率: '),
-                        DropdownButton<String>(
-                          value: _selectedResolution,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedResolution = newValue!;
-                            });
-                          },
-                          items: _resolutions.map<DropdownMenuItem<String>>((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            );
-                          }).toList(),
-                        ),
-                        SizedBox(width: 20),
-                        Text('刷新率: '),
-                        DropdownButton<int>(
-                          value: _selectedRefreshRate,
-                          onChanged: (int? newValue) {
-                            setState(() {
-                              _selectedRefreshRate = newValue!;
-                            });
-                          },
-                          items: _refreshRates.map<DropdownMenuItem<int>>((int value) {
-                            return DropdownMenuItem<int>(
-                              value: value,
-                              child: Text('${value}Hz'),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: _createCustomDisplay,
-                      child: Text('创建自定义显示器 (${_selectedResolution}@${_selectedRefreshRate}Hz) (update bug)'),
-                    ),
                   ],
                 ),
               ),
+            ),
+            SizedBox(height: 16),
+            
+            // Custom Display Configurations section
+            if (customConfigs.isNotEmpty) ...[
+              Text(
+                '自定义可配置显示器分辨率',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              SizedBox(height: 8),
+              Container(
+                height: 150,
+                child: ListView.builder(
+                  itemCount: customConfigs.length,
+                  itemBuilder: (context, index) {
+                    final config = customConfigs[index];
+                    return Card(
+                      margin: EdgeInsets.only(bottom: 4.0),
+                      child: ListTile(
+                        title: Text('${config['width']}x${config['height']} @ ${config['refreshRate']}Hz'),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removeCustomConfig(index),
+                          tooltip: 'Remove',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            Row(
+              children: [
+                ElevatedButton(
+                  onPressed: _addCustomConfig,
+                  child: Text('添加自定义分辨率'),
+                ),
+                SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _loadCustomConfigs,
+                  child: Text('加载已添加分辨率'),
+                ),
+              ],
             ),
             SizedBox(height: 16),
             

@@ -951,35 +951,6 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
-  } else if (method_call.method_name().compare("createDisplayWithConfig") == 0) {
-     if (VirtualDisplayControl::IsInitialized()) {
-         auto width_iter = args->find(flutter::EncodableValue("width"));
-         auto height_iter = args->find(flutter::EncodableValue("height"));
-         auto refreshRate_iter = args->find(flutter::EncodableValue("refreshRate"));
-         
-         if (width_iter == args->end() || height_iter == args->end() || refreshRate_iter == args->end()) {
-             result->Error("MISSING_ARGUMENT", "Missing width, height, or refreshRate arguments");
-             return;
-         }
-         
-         auto width = width_iter->second;
-         auto height = height_iter->second;
-         auto refreshRate = refreshRate_iter->second;
-         
-         int displayId = VirtualDisplayControl::AddDisplay(
-             static_cast<int>(std::get<int>(width)),
-             static_cast<int>(std::get<int>(height)),
-             static_cast<int>(std::get<int>(refreshRate))
-         );
-         
-         if (displayId >= 0) {
-             result->Success(flutter::EncodableValue(displayId));
-         } else {
-             result->Error("CREATE_FAILED", "Failed to create display with config");
-         }
-     } else {
-         result->Error("NOT_INITIALIZED", "Parsec not initialized");
-     }
   } else if (method_call.method_name().compare("removeDisplay") == 0) {
      auto displayId_iter = args->find(flutter::EncodableValue("displayUid"));
      if (displayId_iter == args->end()) {
@@ -1053,13 +1024,82 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      new_config.height = std::get<int>(height_it->second);
      new_config.refresh_rate = std::get<int>(refresh_rate_it->second);
      
-     // Optional bit depth
-     auto bit_depth_it = arguments->find(flutter::EncodableValue("bitDepth"));
-     if (bit_depth_it != arguments->end()) {
-         new_config.bit_depth = std::get<int>(bit_depth_it->second);
+     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_uid, new_config);
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getDisplayConfigs") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     if (display_uid_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
+         return;
      }
      
-     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_uid, new_config);
+     int display_uid = std::get<int>(display_uid_it->second);
+     
+     auto displays = VirtualDisplayControl::GetDetailedDisplayList();
+     auto it = std::find_if(displays.begin(), displays.end(),
+         [display_uid](const VirtualDisplayControl::DetailedDisplayInfo& display) {
+             return display.display_uid == display_uid;
+         });
+     
+     if (it == displays.end()) {
+         result->Error("DISPLAY_NOT_FOUND", "Display not found");
+         return;
+     }
+     
+     flutter::EncodableList configList;
+     
+     std::cout << "Getting configs for display UID: " << display_uid << std::endl;
+     
+     auto configs = VirtualDisplayControl::GetDisplayConfigs(display_uid);
+     for (const auto& config : configs) {
+         flutter::EncodableMap configMap;
+         configMap[flutter::EncodableValue("width")] = flutter::EncodableValue(config.width);
+         configMap[flutter::EncodableValue("height")] = flutter::EncodableValue(config.height);
+         configMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(config.refresh_rate);
+         configList.push_back(flutter::EncodableValue(configMap));
+     }
+     
+     result->Success(flutter::EncodableValue(configList));
+  } else if (method_call.method_name().compare("getCustomDisplayConfigs") == 0) {
+     auto configs = VirtualDisplayControl::GetCustomDisplayConfigs();
+     
+     flutter::EncodableList configList;
+     for (const auto& config : configs) {
+         flutter::EncodableMap configMap;
+         configMap[flutter::EncodableValue("width")] = flutter::EncodableValue(config.width);
+         configMap[flutter::EncodableValue("height")] = flutter::EncodableValue(config.height);
+         configMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(config.refresh_rate);
+         configList.push_back(flutter::EncodableValue(configMap));
+     }
+     
+     result->Success(flutter::EncodableValue(configList));
+  } else if (method_call.method_name().compare("setCustomDisplayConfigs") == 0) {
+     auto configs_it = args->find(flutter::EncodableValue("configs"));
+     if (configs_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'configs' argument");
+         return;
+     }
+     
+     auto configs_list = std::get<flutter::EncodableList>(configs_it->second);
+     std::vector<VirtualDisplay::DisplayConfig> configs;
+     
+     for (const auto& item : configs_list) {
+         auto config_map = std::get<flutter::EncodableMap>(item);
+         
+         auto width_it = config_map.find(flutter::EncodableValue("width"));
+         auto height_it = config_map.find(flutter::EncodableValue("height"));
+         auto refresh_rate_it = config_map.find(flutter::EncodableValue("refreshRate"));
+         
+         if (width_it != config_map.end() && height_it != config_map.end() && refresh_rate_it != config_map.end()) {
+             VirtualDisplay::DisplayConfig config;
+             config.width = std::get<int>(width_it->second);
+             config.height = std::get<int>(height_it->second);
+             config.refresh_rate = std::get<int>(refresh_rate_it->second);
+             configs.push_back(config);
+         }
+     }
+     
+     bool success = VirtualDisplayControl::SetCustomDisplayConfigs(configs);
      result->Success(flutter::EncodableValue(success));
   } else {
     result->NotImplemented();

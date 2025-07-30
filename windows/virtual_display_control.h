@@ -13,7 +13,6 @@ public:
     static bool Initialize();
     static void Shutdown();
     static int AddDisplay();
-    static int AddDisplay(int width, int height, int refresh_rate = 60);
     static bool RemoveDisplay(int display_uid);
 
     static int GetDisplayCount();
@@ -25,6 +24,9 @@ public:
     static bool CheckVddStatus();
     static int GetAllDisplays();
     static bool ChangeDisplaySettings(int display_uid, const VirtualDisplay::DisplayConfig& config);
+    static std::vector<VirtualDisplay::DisplayConfig> GetDisplayConfigs(int display_uid);
+    static std::vector<VirtualDisplay::DisplayConfig> GetCustomDisplayConfigs();
+    static bool SetCustomDisplayConfigs(const std::vector<VirtualDisplay::DisplayConfig>& configs);
 
 
     // Detailed display information structure
@@ -37,7 +39,6 @@ public:
         int width = 1920;
         int height = 1080;
         int refresh_rate = 60;
-        int bit_depth = 32;
         
         // Display information (from VirtualDisplay::DisplayInfo)
         bool active = false;

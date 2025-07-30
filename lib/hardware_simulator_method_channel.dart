@@ -296,15 +296,6 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
-  Future<int> createDisplayWithConfig(int width, int height, int refreshRate) async {
-    return await methodChannel.invokeMethod('createDisplayWithConfig', {
-      'width': width,
-      'height': height,
-      'refreshRate': refreshRate,
-    });
-  }
-
-  @override
   Future<bool> removeDisplay(int displayUid) async {
     return await methodChannel.invokeMethod('removeDisplay', {
       'displayUid': displayUid,
@@ -343,5 +334,28 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
     }
     
     return await methodChannel.invokeMethod('changeDisplaySettings', arguments);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getDisplayConfigs(int displayUid) async {
+    final result = await methodChannel.invokeMethod('getDisplayConfigs', {
+      'displayUid': displayUid,
+    });
+    
+    return List<Map<String, dynamic>>.from(result.map((item) => Map<String, dynamic>.from(item)));
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCustomDisplayConfigs() async {
+    final result = await methodChannel.invokeMethod('getCustomDisplayConfigs');
+    
+    return List<Map<String, dynamic>>.from(result.map((item) => Map<String, dynamic>.from(item)));
+  }
+
+  @override
+  Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) async {
+    return await methodChannel.invokeMethod('setCustomDisplayConfigs', {
+      'configs': configs,
+    });
   }
 }

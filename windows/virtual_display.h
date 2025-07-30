@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <vector>
 
 class VirtualDisplay {
 public:
@@ -10,10 +11,11 @@ public:
         int width;
         int height;
         int refresh_rate;
-        int bit_depth = 32; // Default to 32-bit color depth
         
-        DisplayConfig() : width(1920), height(1080), refresh_rate(60), bit_depth(32) {}
-        DisplayConfig(int w, int h, int rate = 60, int depth = 32) : width(w), height(h), refresh_rate(rate), bit_depth(depth) {}
+        DisplayConfig() : width(0), height(0), refresh_rate(0) {}
+        DisplayConfig(int w, int h, int rate = 60) : width(w), height(h), refresh_rate(rate) {}
+        
+        uint64_t GetBits() const { return (static_cast<uint64_t>(width) << 32) | height; }
     };
 
     struct DisplayInfo {
@@ -29,19 +31,27 @@ public:
 
     VirtualDisplay();
     VirtualDisplay(const DisplayConfig& config, const DisplayInfo& info, int display_uid = -1)
-        : config_(config), info_(info), display_uid_(display_uid){}
+        : config_(config), info_(info), display_uid_(display_uid), current_orientation_(0) {}
     ~VirtualDisplay();
 
     bool ChangeDisplaySettings(const DisplayConfig& config);
+    void FetchAllDisplayConfigs();
     DisplayConfig GetConfig() const { return config_; }
     DisplayInfo GetDisplayInfo() const { return info_; }
     int GetDisplayUid() const { return display_uid_; }
     void SetDisplayUid(int uid) { display_uid_ = uid; }
+    
+    const std::vector<DisplayConfig>& GetDisplayConfigList() const;
+    const DisplayConfig& GetCurrentDisplayConfig() const { return config_; }
+    int GetCurrentOrientation() const { return current_orientation_; }
 
 private:
     DisplayConfig config_;
     DisplayInfo info_;
     int display_uid_;
+    
+    std::vector<DisplayConfig> display_config_list_;
+    int current_orientation_;
 
     VirtualDisplay(const VirtualDisplay&) = delete;
     VirtualDisplay& operator=(const VirtualDisplay&) = delete;

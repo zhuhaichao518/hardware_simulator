@@ -312,58 +312,6 @@ int VirtualDisplayControl::AddDisplay() {
     }
 }
 
-int VirtualDisplayControl::AddDisplay(int width, int height, int refresh_rate) {
-    if (!initialized_ || vdd_handle_ == INVALID_HANDLE_VALUE) {
-        std::cout << "Error: VirtualDisplayControl not initialized" << std::endl;
-        return -1;
-    }
-    
-    int vdd_index = parsec_vdd::VddAddDisplay(vdd_handle_);
-    if (vdd_index >= 0) {
-        std::cout << "Virtual display added with config: " << vdd_index << std::endl;
-
-        //notification
-        std::thread([vdd_index, width, height, refresh_rate]() {
-            const int max_attempts = 5;  
-            const int sleep_ms = 20;
-            
-            std::cout << "Starting async configuration for display " << vdd_index << std::endl;
-            
-            for (int attempt = 0; attempt < max_attempts; ++attempt) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-                
-                int display_count = VirtualDisplayControl::GetAllDisplays();
-                std::cout << "Async attempt " << (attempt + 1) << ": Found " << display_count << " displays" << std::endl;
-                
-                auto it = std::find_if(displays_.begin(), displays_.end(),
-                    [vdd_index](const std::unique_ptr<VirtualDisplay>& display) {
-                        return display->GetDisplayUid() == vdd_index;
-                    });
-
-                if (it != displays_.end()) {
-                    std::cout << "Async: Found new display " << vdd_index << " after " << ((attempt + 1) * sleep_ms) << "ms" << std::endl;
-                    
-                    VirtualDisplay::DisplayConfig config(width, height, refresh_rate);
-                    if ((*it)->ChangeDisplaySettings(config)) {
-                        std::cout << "Async: Successfully applied display settings to " << vdd_index << std::endl;
-                    } else {
-                        std::cout << "Async: Failed to apply display settings to " << vdd_index << std::endl;
-                    }
-                    return;
-                }
-            }
-            
-            std::cout << "Async: Timeout waiting for new display " << vdd_index << " after " << (max_attempts * sleep_ms) << "ms" << std::endl;
-        }).detach();
-
-        return vdd_index;
-    } else {
-        std::cout << "Error: Failed to add display to VDD" << std::endl;
-        return -1;
-    }
-}
-
-//async issue
 bool VirtualDisplayControl::RemoveDisplay(int display_uid) {
     if (!initialized_ || vdd_handle_ == INVALID_HANDLE_VALUE) {
         std::cout << "Error: VirtualDisplayControl not initialized" << std::endl;
@@ -490,7 +438,6 @@ int VirtualDisplayControl::GetAllDisplays() {
                     config.width = dm.dmPelsWidth;
                     config.height = dm.dmPelsHeight;
                     config.refresh_rate = dm.dmDisplayFrequency;
-                    config.bit_depth = dm.dmBitsPerPel;
                 } 
 
                 std::unique_ptr<VirtualDisplay> display = std::make_unique<VirtualDisplay>(config, d);
@@ -513,8 +460,7 @@ int VirtualDisplayControl::GetAllDisplays() {
                 // std::cout << "  Display Config: " 
                 //           << config.width << "x" 
                 //           << config.height << "@" 
-                //           << config.refresh_rate << "Hz, "
-                //           << config.bit_depth << " bits\n";
+                //           << config.refresh_rate << "Hz, ";
                 // std::cout << "=== End ===\n";
         
             }
@@ -601,7 +547,6 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
             info.width = config.width;
             info.height = config.height;
             info.refresh_rate = config.refresh_rate;
-            info.bit_depth = config.bit_depth;
             
             // Copy display info data
             auto display_info = display->GetDisplayInfo();
@@ -632,6 +577,148 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
 
     std::cout << "Returning " << result.size() << " displays" << std::endl;
     return result;
+}
+
+std::vector<VirtualDisplay::DisplayConfig> VirtualDisplayControl::GetDisplayConfigs(int display_uid) {
+    auto it = std::find_if(displays_.begin(), displays_.end(),
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display && display->GetDisplayUid() == display_uid;
+        });
+
+    if (it == displays_.end()) {
+        std::cout << "Display not found for UID: " << display_uid << std::endl;
+        return {};
+    }
+
+    auto& display = *it;
+    if (!display) {
+        std::cout << "Display pointer is null" << std::endl;
+        return {};
+    }
+
+    return display->GetDisplayConfigList();
+}
+
+std::vector<VirtualDisplay::DisplayConfig> VirtualDisplayControl::GetCustomDisplayConfigs() {
+    std::vector<VirtualDisplay::DisplayConfig> configs;
+    
+    HKEY vdd_key;
+    LONG result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, 
+                                L"SOFTWARE\\Parsec\\vdd", 
+                                0, 
+                                KEY_READ, 
+                                &vdd_key);
+    
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to open Parsec VDD registry key" << std::endl;
+        return configs;
+    }
+    
+    for (int i = 0; i < 5; i++) {
+        std::wstring subkey_name = std::to_wstring(i);
+        HKEY index_key;
+        
+        result = RegOpenKeyExW(vdd_key, 
+                               subkey_name.c_str(), 
+                               0, 
+                               KEY_READ, 
+                               &index_key);
+        
+        if (result == ERROR_SUCCESS) {
+            DWORD width, height, hz;
+            DWORD data_size = sizeof(DWORD);
+            
+            LONG width_result = RegQueryValueExW(index_key, L"width", nullptr, nullptr, 
+                                                 reinterpret_cast<BYTE*>(&width), &data_size);
+            data_size = sizeof(DWORD);
+            LONG height_result = RegQueryValueExW(index_key, L"height", nullptr, nullptr, 
+                                                  reinterpret_cast<BYTE*>(&height), &data_size);
+            data_size = sizeof(DWORD);
+            LONG hz_result = RegQueryValueExW(index_key, L"hz", nullptr, nullptr, 
+                                              reinterpret_cast<BYTE*>(&hz), &data_size);
+            
+            if (width_result == ERROR_SUCCESS && height_result == ERROR_SUCCESS && hz_result == ERROR_SUCCESS) {
+                VirtualDisplay::DisplayConfig config;
+                config.width = static_cast<int>(width);
+                config.height = static_cast<int>(height);
+                config.refresh_rate = static_cast<int>(hz);
+                configs.push_back(config);
+            }
+            
+            RegCloseKey(index_key);
+        }
+    }
+    
+    RegCloseKey(vdd_key);
+    std::cout << "Retrieved " << configs.size() << " custom display configs from registry" << std::endl;
+    return configs;
+}
+
+bool VirtualDisplayControl::SetCustomDisplayConfigs(const std::vector<VirtualDisplay::DisplayConfig>& configs) {
+    HKEY vdd_key;
+    LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, 
+                                  L"SOFTWARE\\Parsec\\vdd", 
+                                  0, 
+                                  nullptr, 
+                                  REG_OPTION_NON_VOLATILE, 
+                                  KEY_WRITE, 
+                                  nullptr, 
+                                  &vdd_key, 
+                                  nullptr);
+    
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to create/open Parsec VDD registry key. Admin rights required." << std::endl;
+        return false;
+    }
+    
+    for (int i = 0; i < 5; i++) {
+        std::wstring subkey_name = std::to_wstring(i);
+        
+        if (i >= static_cast<int>(configs.size())) {
+            result = RegDeleteKeyW(vdd_key, subkey_name.c_str());
+            if (result == ERROR_SUCCESS) {
+                std::cout << "Deleted registry subkey: " << i << std::endl;
+            }
+        } else {
+            HKEY index_key;
+            result = RegCreateKeyExW(vdd_key, 
+                                     subkey_name.c_str(), 
+                                     0, 
+                                     nullptr, 
+                                     REG_OPTION_NON_VOLATILE, 
+                                     KEY_WRITE, 
+                                     nullptr, 
+                                     &index_key, 
+                                     nullptr);
+            
+            if (result == ERROR_SUCCESS) {
+                const auto& config = configs[i];
+                DWORD width = static_cast<DWORD>(config.width);
+                DWORD height = static_cast<DWORD>(config.height);
+                DWORD hz = static_cast<DWORD>(config.refresh_rate);
+                
+                RegSetValueExW(index_key, L"width", 0, REG_DWORD, 
+                               reinterpret_cast<const BYTE*>(&width), sizeof(DWORD));
+                RegSetValueExW(index_key, L"height", 0, REG_DWORD, 
+                               reinterpret_cast<const BYTE*>(&height), sizeof(DWORD));
+                RegSetValueExW(index_key, L"hz", 0, REG_DWORD, 
+                               reinterpret_cast<const BYTE*>(&hz), sizeof(DWORD));
+                
+                std::cout << "Set custom display config " << i << ": " 
+                          << config.width << "x" << config.height << "@" << config.refresh_rate << "Hz" << std::endl;
+                
+                RegCloseKey(index_key);
+            } else {
+                std::cout << "Failed to create registry subkey: " << i << std::endl;
+                RegCloseKey(vdd_key);
+                return false;
+            }
+        }
+    }
+    
+    RegCloseKey(vdd_key);
+    std::cout << "Successfully set " << configs.size() << " custom display configs" << std::endl;
+    return true;
 }
 
 
