@@ -187,16 +187,91 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
       }
       if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
         // 这是键盘事件
-        if (isAndroidTV && event.keyCode == KeyEvent.KEYCODE_MENU) {
-          val isDown = when (event.action) {
-            KeyEvent.ACTION_DOWN -> true
-            KeyEvent.ACTION_UP -> false
-            else -> false
+        if (isAndroidTV) {
+          if (event.keyCode == KeyEvent.KEYCODE_MENU){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1082,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
           }
-          channel.invokeMethod("onCursorButton", mapOf(
-            "buttonId" to 3,
-            "isDown" to isDown
-          ))
+          if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1024,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
+          if (event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1025,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
+          if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1019,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
+          if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1020,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
+          if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1021,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
+          if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT){
+            val isDown = when (event.action) {
+              KeyEvent.ACTION_DOWN -> true
+              KeyEvent.ACTION_UP -> false
+              else -> false
+            }
+            channel.invokeMethod("onKeyboardButton", mapOf(
+              "buttonId" to 1022,
+              "isDown" to isDown
+            ))
+            return@registerLockedKeyEventHandler true
+          }
         }
         if (isDpadKey(event.keyCode) ) {
           if (isAndroidTV) {
@@ -217,7 +292,7 @@ class HardwareSimulatorPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
                 //DPad OK button
                 channel.invokeMethod("onKeyboardButton", mapOf(
                   //enter key for android
-                  "buttonId" to 66,
+                  "buttonId" to 1023,
                   "isDown" to isDown
                 ))
               }
