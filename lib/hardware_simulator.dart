@@ -212,4 +212,43 @@ class HardwareSimulator {
   static Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
     return HardwareSimulatorPlatform.instance.setCustomDisplayConfigs(configs);
   }
+
+  // Display orientation management
+  static Future<bool> setDisplayOrientation(int displayUid, DisplayOrientation orientation) {
+    return HardwareSimulatorPlatform.instance.setDisplayOrientation(displayUid, orientation.index);
+  }
+
+  static Future<DisplayOrientation> getDisplayOrientation(int displayUid) async {
+    int orientationIndex = await HardwareSimulatorPlatform.instance.getDisplayOrientation(displayUid);
+    return DisplayOrientation.values[orientationIndex];
+  }
+
+  // Multi-display mode management
+  static Future<bool> setMultiDisplayMode(MultiDisplayMode mode, {int primaryDisplayId = 0}) {
+    return HardwareSimulatorPlatform.instance.setMultiDisplayMode(mode.index, primaryDisplayId);
+  }
+
+  static Future<MultiDisplayMode> getCurrentMultiDisplayMode() async {
+    int modeIndex = await HardwareSimulatorPlatform.instance.getCurrentMultiDisplayMode();
+    if (modeIndex >= 0 && modeIndex < MultiDisplayMode.values.length) {
+      return MultiDisplayMode.values[modeIndex];
+    }
+    return MultiDisplayMode.unknown;
+  }
+}
+
+// Enums for display management
+enum DisplayOrientation {
+  landscape,        // Angle0
+  portrait,         // Angle90
+  landscapeFlipped, // Angle180
+  portraitFlipped   // Angle270
+}
+
+enum DisplayTopologyMode {
+  extend,    // Extend desktop
+  duplicate, // Mirror/Duplicate displays
+  internal,  // Internal display only
+  external,  // External display only
+  clone      // Clone mode
 }

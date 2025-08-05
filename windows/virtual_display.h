@@ -7,6 +7,21 @@
 
 class VirtualDisplay {
 public:
+    enum Orientation {
+        Landscape = 0,      // Angle0
+        Portrait,           // Angle90
+        Landscape_Flipped,  // Angle180
+        Portrait_Flipped    // Angle270
+    };
+
+    enum TopologyMode {
+        Extend = 0,         // Extend desktop
+        Duplicate,          // Mirror/Duplicate displays
+        Internal,           // Internal display only
+        External,           // External display only
+        Clone               // Clone mode
+    };
+
     struct DisplayConfig {
         int width;
         int height;
@@ -31,7 +46,8 @@ public:
 
     VirtualDisplay();
     VirtualDisplay(const DisplayConfig& config, const DisplayInfo& info, int display_uid = -1)
-        : config_(config), info_(info), display_uid_(display_uid), current_orientation_(0) {}
+        : config_(config), info_(info), display_uid_(display_uid), 
+          current_orientation_(Landscape) {}
     ~VirtualDisplay();
 
     bool ChangeDisplaySettings(const DisplayConfig& config);
@@ -43,7 +59,17 @@ public:
     
     const std::vector<DisplayConfig>& GetDisplayConfigList() const;
     const DisplayConfig& GetCurrentDisplayConfig() const { return config_; }
-    int GetCurrentOrientation() const { return current_orientation_; }
+    
+    // Orientation management
+    Orientation GetCurrentOrientation() const { return current_orientation_; }
+    void SetCurrentOrientation(Orientation orientation) {
+        current_orientation_ = orientation;
+    }
+    bool SetOrientation(Orientation orientation);
+    
+    // Static methods for system-wide display topology
+    static bool SetSystemDisplayTopology(TopologyMode mode);
+    static TopologyMode GetSystemDisplayTopology();
 
 private:
     DisplayConfig config_;
@@ -51,7 +77,7 @@ private:
     int display_uid_;
     
     std::vector<DisplayConfig> display_config_list_;
-    int current_orientation_;
+    Orientation current_orientation_;
 
     VirtualDisplay(const VirtualDisplay&) = delete;
     VirtualDisplay& operator=(const VirtualDisplay&) = delete;

@@ -10,6 +10,15 @@
 
 class VirtualDisplayControl {
 public:
+    // Multi-display mode enumeration
+    enum class MultiDisplayMode {
+        Extend = 0,        
+        PrimaryOnly,       
+        SecondaryOnly,     
+        Duplicate,         
+        Unknown
+    };
+
     static bool Initialize();
     static void Shutdown();
     static int AddDisplay();
@@ -28,6 +37,13 @@ public:
     static std::vector<VirtualDisplay::DisplayConfig> GetCustomDisplayConfigs();
     static bool SetCustomDisplayConfigs(const std::vector<VirtualDisplay::DisplayConfig>& configs);
 
+    // Display orientation and topology management
+    static bool SetDisplayOrientation(int display_uid, VirtualDisplay::Orientation orientation);
+    static VirtualDisplay::Orientation GetDisplayOrientation(int display_uid);
+
+    // Multi-display configuration using DisplayConfig API
+    static bool SetMultiDisplayMode(MultiDisplayMode mode, int primary_display_id = 0);
+    static MultiDisplayMode GetCurrentMultiDisplayMode();
 
     // Detailed display information structure
     // This structure mirrors the Dart DisplayData class for consistency
@@ -50,6 +66,7 @@ public:
         
         // Additional fields
         bool is_virtual = false;       // Whether this is a virtual display
+        int orientation = 0;           // Display orientation (0=landscape, 1=portrait, 2=landscape_flipped, 3=portrait_flipped)
     };
     static std::vector<DetailedDisplayInfo> GetDetailedDisplayList();
 

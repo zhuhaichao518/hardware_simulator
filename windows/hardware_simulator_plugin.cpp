@@ -971,14 +971,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      int displayCount = VirtualDisplayControl::GetAllDisplays();
      result->Success(flutter::EncodableValue(displayCount));
   } else if (method_call.method_name().compare("getDisplayList") == 0) {
-     // Get detailed display information
      flutter::EncodableList displayList;
      auto displays = VirtualDisplayControl::GetDetailedDisplayList();
      
      for (const auto& display : displays) {
          flutter::EncodableMap displayMap;
-         
-         // Map C++ fields to Dart DisplayData fields
          displayMap[flutter::EncodableValue("index")] = flutter::EncodableValue(display.index);
          displayMap[flutter::EncodableValue("width")] = flutter::EncodableValue(display.width);
          displayMap[flutter::EncodableValue("height")] = flutter::EncodableValue(display.height);
@@ -988,6 +985,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          displayMap[flutter::EncodableValue("deviceName")] = flutter::EncodableValue(display.device_name);
          displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
          displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
+         displayMap[flutter::EncodableValue("orientation")] = flutter::EncodableValue(display.orientation);
          
          displayList.push_back(flutter::EncodableValue(displayMap));
      }
@@ -1047,9 +1045,6 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      }
      
      flutter::EncodableList configList;
-     
-     std::cout << "Getting configs for display UID: " << display_uid << std::endl;
-     
      auto configs = VirtualDisplayControl::GetDisplayConfigs(display_uid);
      for (const auto& config : configs) {
          flutter::EncodableMap configMap;
@@ -1101,6 +1096,56 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      
      bool success = VirtualDisplayControl::SetCustomDisplayConfigs(configs);
      result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("setDisplayOrientation") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     auto orientation_it = args->find(flutter::EncodableValue("orientation"));
+     
+     if (display_uid_it == args->end() || orientation_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing required arguments");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     int orientation = std::get<int>(orientation_it->second);
+     
+     bool success = VirtualDisplayControl::SetDisplayOrientation(display_uid, 
+                                                                  static_cast<VirtualDisplay::Orientation>(orientation));
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getDisplayOrientation") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     
+     if (display_uid_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing displayUid argument");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     VirtualDisplay::Orientation orientation = VirtualDisplayControl::GetDisplayOrientation(display_uid);
+     
+     result->Success(flutter::EncodableValue(static_cast<int>(orientation)));
+  } else if (method_call.method_name().compare("setMultiDisplayMode") == 0) {
+     auto mode_it = args->find(flutter::EncodableValue("mode"));
+     auto primary_id_it = args->find(flutter::EncodableValue("primaryDisplayId"));
+     
+     if (mode_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing mode argument");
+         return;
+     }
+     
+     int mode = std::get<int>(mode_it->second);
+     int primary_display_id = 0;
+     if (primary_id_it != args->end()) {
+         primary_display_id = std::get<int>(primary_id_it->second);
+     }
+     
+     bool success = VirtualDisplayControl::SetMultiDisplayMode(
+         static_cast<VirtualDisplayControl::MultiDisplayMode>(mode), 
+         primary_display_id);
+     
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getCurrentMultiDisplayMode") == 0) {
+     VirtualDisplayControl::MultiDisplayMode mode = VirtualDisplayControl::GetCurrentMultiDisplayMode();
+     result->Success(flutter::EncodableValue(static_cast<int>(mode)));
   } else {
     result->NotImplemented();
   }

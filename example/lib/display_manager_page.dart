@@ -11,12 +11,14 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
   List<DisplayData> displays = [];
   bool isLoading = false;
   List<Map<String, dynamic>> customConfigs = [];
+  MultiDisplayMode currentMultiDisplayMode = MultiDisplayMode.unknown;
 
   @override
   void initState() {
     super.initState();
     _loadDisplays();
     _loadCustomConfigs();
+    _loadCurrentMultiDisplayMode();
   }
 
   Future<void> _loadDisplays() async {
@@ -56,6 +58,53 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
       });
     } catch (e) {
       print('Failed to load custom configs: $e');
+    }
+  }
+
+  Future<void> _loadCurrentMultiDisplayMode() async {
+    try {
+      MultiDisplayMode mode = await HardwareSimulator.getCurrentMultiDisplayMode();
+      setState(() {
+        currentMultiDisplayMode = mode;
+      });
+      print('Current multi-display mode: $mode');
+    } catch (e) {
+      print('Failed to load current multi-display mode: $e');
+    }
+  }
+
+  Future<void> _setMultiDisplayMode(MultiDisplayMode mode) async {
+    try {
+      bool success = await HardwareSimulator.setMultiDisplayMode(mode);
+      if (success) {
+        await _loadCurrentMultiDisplayMode();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('多显示器模式已更改为 ${_getMultiDisplayModeName(mode)}')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更改多显示器模式失败')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('更改多显示器模式失败: $e')),
+      );
+    }
+  }
+
+  String _getMultiDisplayModeName(MultiDisplayMode mode) {
+    switch (mode) {
+      case MultiDisplayMode.extend:
+        return '扩展这些显示器';
+      case MultiDisplayMode.primaryOnly:
+        return '仅在主显示器上显示';
+      case MultiDisplayMode.secondaryOnly:
+        return '仅在副显示器上显示';
+      case MultiDisplayMode.duplicate:
+        return '复制这些显示器';
+      case MultiDisplayMode.unknown:
+        return '未知模式';
     }
   }
 
@@ -379,6 +428,41 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
     }
   }
 
+  String _getOrientationName(int orientation) {
+    switch (orientation) {
+      case 0:
+        return '横向 (0°)';
+      case 1:
+        return '竖向 (90°)';
+      case 2:
+        return '横向翻转 (180°)';
+      case 3:
+        return '竖向翻转 (270°)';
+      default:
+        return '未知';
+    }
+  }
+
+  Future<void> _setDisplayOrientation(int displayUid, DisplayOrientation orientation) async {
+    try {
+      bool success = await HardwareSimulator.setDisplayOrientation(displayUid, orientation);
+      if (success) {
+        await _loadDisplays();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('显示器方向已更改')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更改显示器方向失败')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('更改显示器方向失败: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -391,11 +475,108 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 多显示器模式控制面板 (当显示器数量>1时显示)
+            if (displays.length > 1) ...[
+              Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '多显示器模式设置',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text('当前模式: ${_getMultiDisplayModeName(currentMultiDisplayMode)}'),
+                          SizedBox(width: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadCurrentMultiDisplayMode,
+                            icon: Icon(Icons.refresh, size: 16),
+                            label: Text('刷新模式'),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _setMultiDisplayMode(MultiDisplayMode.extend),
+                            icon: Icon(Icons.open_in_full),
+                            label: Text('扩展这些显示器'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: currentMultiDisplayMode == MultiDisplayMode.extend ? Colors.blue : null,
+                            ),
+                          ),
+                          // 当显示器数量>=3时，只允许扩展模式
+                          if (displays.length < 3) ...[
+                            ElevatedButton.icon(
+                              onPressed: () => _setMultiDisplayMode(MultiDisplayMode.duplicate),
+                              icon: Icon(Icons.content_copy),
+                              label: Text('复制这些显示器'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: currentMultiDisplayMode == MultiDisplayMode.duplicate ? Colors.blue : null,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () => _setMultiDisplayMode(MultiDisplayMode.primaryOnly),
+                              icon: Icon(Icons.looks_one),
+                              label: Text('仅在显示器1上显示'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: currentMultiDisplayMode == MultiDisplayMode.primaryOnly ? Colors.blue : null,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () => _setMultiDisplayMode(MultiDisplayMode.secondaryOnly),
+                              icon: Icon(Icons.looks_two),
+                              label: Text('仅在显示器2上显示'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: currentMultiDisplayMode == MultiDisplayMode.secondaryOnly ? Colors.blue : null,
+                              ),
+                            ),
+                          ] else ...[
+                            // 当显示器>=3时，显示提示信息
+                            Container(
+                              padding: EdgeInsets.all(8.0),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.info, color: Colors.orange, size: 16),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '当连接3个或更多显示器时，只能使用扩展模式',
+                                    style: TextStyle(color: Colors.orange[800], fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+            
             // 创建显示器的控制区域
             Card(
               child: Padding(
@@ -459,7 +640,7 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
               children: [
                 ElevatedButton(
                   onPressed: _addCustomConfig,
-                  child: Text('添加自定义分辨率'),
+                  child: Text('添加自定义分辨率（Admin）'),
                 ),
                 SizedBox(width: 16),
                 ElevatedButton(
@@ -497,14 +678,11 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                 ),
               )
             else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: displays.length,
-                  itemBuilder: (context, index) {
-                    DisplayData display = displays[index];
-                    return Card(
-                      margin: EdgeInsets.only(bottom: 8.0),
-                      child: ListTile(
+              Column(
+                children: displays.map((display) {
+                  return Card(
+                    margin: EdgeInsets.only(bottom: 8.0),
+                    child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: display.isVirtual ? Colors.blue : Colors.green,
                           child: Text('${display.index}'),
@@ -516,11 +694,35 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                             Text('分辨率: ${display.width}x${display.height}'),
                             Text('刷新率: ${display.refreshRate}Hz'),
                             Text('类型: ${display.isVirtual ? "虚拟显示器" : "物理显示器"}'),
+                            Text('方向: ${_getOrientationName(display.orientation)}'),
                           ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            PopupMenuButton<DisplayOrientation>(
+                              icon: Icon(Icons.screen_rotation, color: Colors.orange),
+                              tooltip: '旋转屏幕',
+                              onSelected: (orientation) => _setDisplayOrientation(display.displayUid, orientation),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: DisplayOrientation.landscape,
+                                  child: Text('横向 (0°)'),
+                                ),
+                                PopupMenuItem(
+                                  value: DisplayOrientation.portrait,
+                                  child: Text('竖向 (90°)'),
+                                ),
+                                PopupMenuItem(
+                                  value: DisplayOrientation.landscapeFlipped,
+                                  child: Text('横向翻转 (180°)'),
+                                ),
+                                PopupMenuItem(
+                                  value: DisplayOrientation.portraitFlipped,
+                                  child: Text('竖向翻转 (270°)'),
+                                ),
+                              ],
+                            ),
                             if (display.isVirtual) ...[
                               IconButton(
                                 icon: Icon(Icons.edit, color: Colors.blue),
@@ -539,8 +741,7 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                         isThreeLine: true,
                       ),
                     );
-                  },
-                ),
+                  }).toList(),
               ),
           ],
         ),

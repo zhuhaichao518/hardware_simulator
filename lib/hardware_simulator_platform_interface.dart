@@ -203,4 +203,21 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
     throw UnimplementedError('setCustomDisplayConfigs() has not been implemented.');
   }
+
+  Future<bool> setDisplayOrientation(int displayUid, int orientation) {
+    throw UnimplementedError('setDisplayOrientation() has not been implemented.');
+  }
+
+  Future<int> getDisplayOrientation(int displayUid) {
+    throw UnimplementedError('getDisplayOrientation() has not been implemented.');
+  }
+
+  // Multi-display mode management
+  Future<bool> setMultiDisplayMode(int mode, int primaryDisplayId) {
+    throw UnimplementedError('setMultiDisplayMode() has not been implemented.');
+  }
+
+  Future<int> getCurrentMultiDisplayMode() {
+    throw UnimplementedError('getCurrentMultiDisplayMode() has not been implemented.');
+  }
 }

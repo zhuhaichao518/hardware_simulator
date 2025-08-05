@@ -358,4 +358,32 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'configs': configs,
     });
   }
+
+  @override
+  Future<bool> setDisplayOrientation(int displayUid, int orientation) async {
+    return await methodChannel.invokeMethod('setDisplayOrientation', {
+      'displayUid': displayUid,
+      'orientation': orientation,
+    });
+  }
+
+  @override
+  Future<int> getDisplayOrientation(int displayUid) async {
+    return await methodChannel.invokeMethod('getDisplayOrientation', {
+      'displayUid': displayUid,
+    });
+  }
+
+  @override
+  Future<bool> setMultiDisplayMode(int mode, int primaryDisplayId) async {
+    return await methodChannel.invokeMethod('setMultiDisplayMode', {
+      'mode': mode,
+      'primaryDisplayId': primaryDisplayId,
+    });
+  }
+
+  @override
+  Future<int> getCurrentMultiDisplayMode() async {
+    return await methodChannel.invokeMethod('getCurrentMultiDisplayMode');
+  }
 }

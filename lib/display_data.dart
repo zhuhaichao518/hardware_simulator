@@ -1,3 +1,10 @@
+enum MultiDisplayMode {
+  extend,        
+  primaryOnly,   
+  secondaryOnly,
+  duplicate,     
+  unknown
+}
 
 class DisplayData {
   final int index;
@@ -9,6 +16,7 @@ class DisplayData {
   final String deviceName;
   final bool active;
   final int displayUid;
+  final int orientation;
   
   DisplayData({
     required this.index,
@@ -20,6 +28,7 @@ class DisplayData {
     required this.deviceName,
     required this.active,
     required this.displayUid,
+    required this.orientation,
   });
   
   factory DisplayData.fromMap(Map<String, dynamic> map) {
@@ -32,7 +41,8 @@ class DisplayData {
       displayName: map['displayName'] ?? '',  
       deviceName: map['deviceName'] ?? '',   
       active: map['active'] ?? true,
-      displayUid: map['displayUid'] ?? 0,    
+      displayUid: map['displayUid'] ?? 0,
+      orientation: map['orientation'] ?? 0,
     );
   }
 }

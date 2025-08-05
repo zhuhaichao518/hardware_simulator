@@ -3,6 +3,14 @@
 #include <cstring>
 #include <cstdio>
 #include <iostream>
+
+#ifndef WINVER
+#define WINVER 0x0600
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+
 #include <windows.h>
 #include <cfgmgr32.h>
 #include <setupapi.h>
@@ -12,7 +20,7 @@
 #include <devpkey.h>
 
 
-VirtualDisplay::VirtualDisplay() : display_uid_(-1), current_orientation_(0) {
+VirtualDisplay::VirtualDisplay() : display_uid_(-1), current_orientation_(Landscape){
     std::cout << "VirtualDisplay created" << std::endl;
     config_ = DisplayConfig();
 }
@@ -51,7 +59,7 @@ void VirtualDisplay::FetchAllDisplayConfigs() {
 
         if (config_num == -1) {
             config_ = display_config;
-            current_orientation_ = dev_mode.dmDisplayOrientation;
+            current_orientation_ = static_cast<VirtualDisplay::Orientation>(dev_mode.dmDisplayOrientation);
         } else {
             display_config_list_.push_back(display_config);
         }
@@ -68,4 +76,134 @@ void VirtualDisplay::FetchAllDisplayConfigs() {
 const std::vector<VirtualDisplay::DisplayConfig>& VirtualDisplay::GetDisplayConfigList() const {
     const_cast<VirtualDisplay*>(this)->FetchAllDisplayConfigs();
     return display_config_list_;
+}
+
+bool VirtualDisplay::SetOrientation(Orientation orientation) {
+    DEVMODEW dm = {};
+    dm.dmSize = sizeof(dm);
+
+    if(current_orientation_ == orientation){
+        return true;
+    }
+    
+    std::wstring device_name_w(info_.device_name.begin(), info_.device_name.end());
+    
+    if (EnumDisplaySettingsW(device_name_w.c_str(), ENUM_CURRENT_SETTINGS, &dm)) {
+        DWORD original_width = dm.dmPelsWidth;
+        DWORD original_height = dm.dmPelsHeight;
+        
+        dm.dmDisplayOrientation = static_cast<DWORD>(orientation);
+        
+        bool current_is_portrait = (current_orientation_ == Portrait || current_orientation_ == Portrait_Flipped);
+        bool target_is_portrait = (orientation == Portrait || orientation == Portrait_Flipped);
+        
+        if (current_is_portrait != target_is_portrait) {
+            dm.dmPelsWidth = original_height;
+            dm.dmPelsHeight = original_width;
+        } else {
+            dm.dmPelsWidth = original_width;
+            dm.dmPelsHeight = original_height;
+        }
+
+        dm.dmFields = DM_DISPLAYORIENTATION | DM_PELSWIDTH | DM_PELSHEIGHT;
+        
+        LONG result = ::ChangeDisplaySettingsExW(device_name_w.c_str(), &dm, NULL, CDS_UPDATEREGISTRY, NULL);
+        if (result == DISP_CHANGE_SUCCESSFUL) {
+            current_orientation_ = orientation;
+            return true;
+        } else {
+            std::cout << "Failed to set orientation. Error code: " << result;
+        }
+    } else {
+        std::cout << "Failed to get current display settings for device: " << info_.device_name << std::endl;
+    }
+    return false;
+}
+
+bool VirtualDisplay::SetSystemDisplayTopology(TopologyMode mode) {
+    UINT32 path_count = 0;
+    UINT32 mode_count = 0;
+    
+    LONG result = GetDisplayConfigBufferSizes(QDC_ALL_PATHS, &path_count, &mode_count);
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to get display config buffer sizes: " << result << std::endl;
+        return false;
+    }
+    
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    
+    result = QueryDisplayConfig(QDC_ALL_PATHS, &path_count, paths.data(), 
+                               &mode_count, modes.data(), nullptr);
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to query display config: " << result << std::endl;
+        return false;
+    }
+    
+    UINT32 flags = SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG;
+    switch (mode) {
+        case Extend:
+            flags |= SDC_TOPOLOGY_EXTEND;
+            break;
+        case Duplicate:
+            flags |= SDC_TOPOLOGY_CLONE;
+            break;
+        case Internal:
+            flags |= SDC_TOPOLOGY_INTERNAL;
+            break;
+        case External:
+            flags |= SDC_TOPOLOGY_EXTERNAL;
+            break;
+        case Clone:
+            flags |= SDC_TOPOLOGY_CLONE;
+            break;
+    }
+    
+    result = SetDisplayConfig(path_count, paths.data(), mode_count, modes.data(), flags);
+    if (result == ERROR_SUCCESS) {
+        std::cout << "Successfully set display topology mode: " << mode << std::endl;
+        return true;
+    } else {
+        std::cout << "Failed to set display topology: " << result << std::endl;
+        return false;
+    }
+}
+
+VirtualDisplay::TopologyMode VirtualDisplay::GetSystemDisplayTopology() {
+    UINT32 path_count = 0;
+    UINT32 mode_count = 0;
+    
+    LONG result = GetDisplayConfigBufferSizes(QDC_ALL_PATHS, &path_count, &mode_count);
+    if (result != ERROR_SUCCESS) {
+        return Extend;
+    }
+    
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    
+    result = QueryDisplayConfig(QDC_ALL_PATHS, &path_count, paths.data(), 
+                               &mode_count, modes.data(), nullptr);
+    if (result != ERROR_SUCCESS) {
+        return Extend;
+    }
+    
+    int active_displays = 0;
+    bool has_clone = false;
+    
+    for (const auto& path : paths) {
+        if (path.flags & DISPLAYCONFIG_PATH_ACTIVE) {
+            active_displays++;
+            if (path.flags & DISPLAYCONFIG_PATH_CLONE_GROUP_INVALID) {
+                has_clone = true;
+            }
+        }
+    }
+    
+    if (active_displays <= 1) {
+        return Internal;
+    } else if (has_clone) {
+        return Duplicate;
+    } else {
+        return Extend;
+    }
 }

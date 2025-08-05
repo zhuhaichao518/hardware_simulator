@@ -11,20 +11,30 @@
 #include <cfgmgr32.h>
 #include <setupapi.h>
 #include <devpkey.h>    // DEVPKEY_Device_*
+#include <winuser.h>    // DisplayConfig APIs
 
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
+#include <functional>
 #include <algorithm>
 #include "virtual_display.h"
-
 
 bool VirtualDisplayControl::initialized_ = false;
 HANDLE VirtualDisplayControl::vdd_handle_ = INVALID_HANDLE_VALUE;
 std::vector<std::unique_ptr<VirtualDisplay>> VirtualDisplayControl::displays_;
 
-
 namespace {
+
+struct LuidCompare {
+    bool operator()(const LUID& a, const LUID& b) const {
+        if (a.HighPart != b.HighPart) {
+            return a.HighPart < b.HighPart;
+        }
+        return a.LowPart < b.LowPart;
+    }
+};
 
 static std::string WideStringToString(const std::wstring& wstr) {
     if (wstr.empty()) return std::string();
@@ -73,20 +83,15 @@ static std::vector<std::string> GetDisplayPaths() {
     return paths;
 }
 
-// C# static int ParseDisplayAddress(string path)
 static int ParseDisplayAddress(const std::string& path) {
-
     auto pos = path.find("UID");
     if (pos != std::string::npos) {
    
         std::string uidStr = path.substr(pos + 3); 
-        
-
         size_t endPos = 0;
         while (endPos < uidStr.length() && std::isdigit(uidStr[endPos])) {
             endPos++;
         }
-        
         if (endPos > 0) {
             try {
                 std::string numberStr = uidStr.substr(0, endPos);
@@ -96,11 +101,9 @@ static int ParseDisplayAddress(const std::string& path) {
             }
         }
     }
-    
     return 0;
 }
 
-// C# static string ParseDisplayCode(string id)
 static std::string ParseDisplayCode(const std::string& id) {
     std::vector<std::string> tok;
     size_t start = 0;
@@ -216,9 +219,7 @@ static std::string FileTimeToString(const FILETIME& ft) {
     
     return std::string(buffer);
 }
-
 }
-
 
 bool VirtualDisplayControl::Initialize() {
     if (initialized_) {
@@ -228,21 +229,17 @@ bool VirtualDisplayControl::Initialize() {
     
     parsec_vdd::DeviceStatus status = parsec_vdd::QueryDeviceStatus(&parsec_vdd::VDD_CLASS_GUID, parsec_vdd::VDD_HARDWARE_ID);
     
+    //TODOXU:return value to check?
     switch (status) {
         case parsec_vdd::DEVICE_OK:
-            std::cout << "Parsec VDD driver is ready" << std::endl;
             break;
         case parsec_vdd::DEVICE_NOT_INSTALLED:
-            std::cout << "Error: Parsec VDD driver is not installed" << std::endl;
             return false;
         case parsec_vdd::DEVICE_DISABLED:
-            std::cout << "Error: Parsec VDD driver is disabled" << std::endl;
             return false;
         case parsec_vdd::DEVICE_RESTART_REQUIRED:
-            std::cout << "Warning: Restart required for Parsec VDD driver" << std::endl;
             break;
         default:
-            std::cout << "Warning: Parsec VDD driver status unknown: " << status << std::endl;
             break;
     }
     
@@ -271,8 +268,6 @@ bool VirtualDisplayControl::Initialize() {
         }
     });
     updater.detach();
-    
-    std::cout << "VirtualDisplayControl initialized successfully" << std::endl;
     return true;
 }
 
@@ -292,7 +287,6 @@ void VirtualDisplayControl::Shutdown() {
     
     initialized_ = false;
     displays_.clear();
-    std::cout << "VirtualDisplayControl shutdown completed" << std::endl;
 }
 
 int VirtualDisplayControl::AddDisplay() {
@@ -434,10 +428,18 @@ int VirtualDisplayControl::GetAllDisplays() {
                 dm.dmSize = sizeof(dm);
                 VirtualDisplay::DisplayConfig config = VirtualDisplay::DisplayConfig();
 
+
+                VirtualDisplay::Orientation current_orientation_ = VirtualDisplay::Landscape; // Default orientation
                 if (EnumDisplaySettingsW(ddAdapter.DeviceName, ENUM_CURRENT_SETTINGS, &dm)) {
                     config.width = dm.dmPelsWidth;
                     config.height = dm.dmPelsHeight;
                     config.refresh_rate = dm.dmDisplayFrequency;
+                    current_orientation_ = static_cast<VirtualDisplay::Orientation>(dm.dmDisplayOrientation);
+                    
+                    std::cout << "Device: " << WideStringToString(ddAdapter.DeviceName) 
+                              << ", Raw orientation: " << dm.dmDisplayOrientation 
+                              << ", Casted orientation: " << static_cast<int>(current_orientation_)
+                              << ", Resolution: " << dm.dmPelsWidth << "x" << dm.dmPelsHeight << std::endl;
                 } 
 
                 std::unique_ptr<VirtualDisplay> display = std::make_unique<VirtualDisplay>(config, d);
@@ -446,6 +448,7 @@ int VirtualDisplayControl::GetAllDisplays() {
                 } else { 
                     display->SetDisplayUid(d.display_uid);
                 }
+                display->SetCurrentOrientation(current_orientation_);
 
                 displayMap[devicePath] = std::move(display);
                
@@ -559,6 +562,7 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
             
             // Set additional fields
             info.is_virtual = display_info.is_virtual;  // These are managed virtual displays
+            info.orientation = static_cast<int>(display->GetCurrentOrientation());  // Orientation field
 
             
             // std::cout << "Display[" << i << "]:" << std::endl;
@@ -719,6 +723,146 @@ bool VirtualDisplayControl::SetCustomDisplayConfigs(const std::vector<VirtualDis
     RegCloseKey(vdd_key);
     std::cout << "Successfully set " << configs.size() << " custom display configs" << std::endl;
     return true;
+}
+
+bool VirtualDisplayControl::SetDisplayOrientation(int display_uid, VirtualDisplay::Orientation orientation) {
+    auto it = std::find_if(displays_.begin(), displays_.end(),
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display && display->GetDisplayUid() == display_uid;
+        });
+
+    if (it == displays_.end()) {
+        std::cout << "Error: Invalid display UID:" << display_uid << std::endl;
+        return false;
+    }
+
+    auto& display = *it;
+
+    return display->SetOrientation(orientation);
+}
+
+VirtualDisplay::Orientation VirtualDisplayControl::GetDisplayOrientation(int display_uid) {
+    auto it = std::find_if(displays_.begin(), displays_.end(),
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display && display->GetDisplayUid() == display_uid;
+        });
+
+    if (it == displays_.end()) {
+        std::cout << "Error: Invalid display UID:" << display_uid << std::endl;
+        return VirtualDisplay::Landscape; // Default orientation
+    }
+
+    auto& display = *it;
+
+    return display->GetCurrentOrientation();
+}
+
+bool VirtualDisplayControl::SetMultiDisplayMode(MultiDisplayMode mode, int primary_display_id) {
+    UINT32 flags = SDC_APPLY;
+    
+    switch (mode) {
+        case MultiDisplayMode::Extend:
+            flags |= SDC_TOPOLOGY_EXTEND;
+            break;
+            
+        case MultiDisplayMode::Duplicate:
+            flags |= SDC_TOPOLOGY_CLONE;
+            break;
+            
+        case MultiDisplayMode::PrimaryOnly:
+            flags |= SDC_TOPOLOGY_INTERNAL;
+            break;
+            
+        case MultiDisplayMode::SecondaryOnly:
+            flags |= SDC_TOPOLOGY_EXTERNAL;
+            break;
+            
+        default:
+            std::cout << "Unknown multi-display mode: " << static_cast<int>(mode) << std::endl;
+            return false;
+    }
+    
+    LONG result = SetDisplayConfig(0, nullptr, 0, nullptr, flags);
+    if (result == ERROR_SUCCESS) {
+        std::cout << "Successfully set multi-display mode: " << static_cast<int>(mode) << std::endl;
+        return true;
+    } else {
+        std::cout << "Failed to set multi-display mode: " << result << std::endl;
+        return false;
+    }
+}
+
+VirtualDisplayControl::MultiDisplayMode VirtualDisplayControl::GetCurrentMultiDisplayMode() {
+    std::cout << "=== GetCurrentMultiDisplayMode called ===" << std::endl;
+    
+    UINT32 path_count = 0;
+    UINT32 mode_count = 0;
+    
+    LONG result = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count);
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to get display config buffer sizes: " << result << std::endl;
+        return MultiDisplayMode::Unknown;
+    }
+    
+    std::cout << "Buffer sizes - paths: " << path_count << ", modes: " << mode_count << std::endl;
+    
+    if (path_count == 0) {
+        std::cout << "No display paths found" << std::endl;
+        return MultiDisplayMode::Unknown;
+    }
+    
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    
+    result = QueryDisplayConfig(
+        QDC_ONLY_ACTIVE_PATHS,
+        &path_count, paths.data(),
+        &mode_count, modes.data(),
+        nullptr
+    );
+    
+    std::cout << "QueryDisplayConfig result: " << result << std::endl;
+    
+    if (result != ERROR_SUCCESS) {
+        std::cout << "Failed to query display config: " << result << std::endl;
+        return MultiDisplayMode::Unknown;
+    }
+    
+    std::map<std::string, int> unique_sources;
+    int active_paths = 0;
+    
+    for (const auto& path : paths) {
+        if (path.flags & DISPLAYCONFIG_PATH_ACTIVE) {
+            active_paths++;
+            std::string source_key = std::to_string(path.sourceInfo.adapterId.HighPart) + 
+                                   "_" + std::to_string(path.sourceInfo.adapterId.LowPart) + 
+                                   "_" + std::to_string(path.sourceInfo.id);
+            unique_sources[source_key]++;
+            std::cout << "Active path: adapter=" << path.sourceInfo.adapterId.HighPart 
+                      << ":" << path.sourceInfo.adapterId.LowPart 
+                      << ", sourceId=" << path.sourceInfo.id << std::endl;
+        }
+    }
+    
+    std::cout << "Active paths: " << active_paths << ", Unique sources: " << unique_sources.size() << std::endl;
+    
+    if (active_paths <= 1) {
+        std::cout << "Returning: PrimaryOnly (single display)" << std::endl;
+        return MultiDisplayMode::PrimaryOnly;
+    }
+    
+    if (unique_sources.size() == 1 && active_paths > 1) {
+        std::cout << "Returning: Duplicate (one source, multiple targets)" << std::endl;
+        return MultiDisplayMode::Duplicate;
+    }
+    
+    if (unique_sources.size() > 1 && unique_sources.size() == static_cast<size_t>(active_paths)) {
+        std::cout << "Returning: Extend (one-to-one multiple displays)" << std::endl;
+        return MultiDisplayMode::Extend;
+    }
+    
+    std::cout << "Returning: SecondaryOnly (complex configuration)" << std::endl;
+    return MultiDisplayMode::SecondaryOnly;
 }
 
 
