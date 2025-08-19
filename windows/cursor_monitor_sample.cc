@@ -279,16 +279,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    CursorMonitor::startHook([](int message, int msg_info, const std::vector<uint8_t>& bytes) {
        int b;
        switch (message) {
-       case CURSOR_INVISIBLE:
+       case CPP_CURSOR_INVISIBLE:
            b = 0;
            break;
-       case CURSOR_VISIBLE:
+       case CPP_CURSOR_VISIBLE:
            b = 0;
            break;
-       case CURSOR_UPDATED_DEFAULT:
+       case CPP_CURSOR_UPDATED_DEFAULT:
            b = 0;
            break;
-       case CURSOR_UPDATED_IMAGE:
+       case CPP_CURSOR_UPDATED_IMAGE:
        {
            uint32_t width, height, hotX, hotY, hash;
            std::vector<uint32_t> imageData;
@@ -296,7 +296,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
            DrawBufferToHWND(&imageData[0], width, height, hWnd);
            break;
        }
-       case CURSOR_UPDATED_CACHED:
+       case CPP_CURSOR_UPDATED_CACHED:
            b = 0;
            break;
        }

@@ -385,7 +385,7 @@ void SyncCursorImage() {
     if (h != NULL) {
         for (auto callback : callbacks) {
             if (!hookAllCursorImage[callback.first]) {
-                callback.second(CURSOR_UPDATED_DEFAULT, (int)reinterpret_cast<intptr_t>(h), {});
+                callback.second(CPP_CURSOR_UPDATED_DEFAULT, (int)reinterpret_cast<intptr_t>(h), {});
             } else {
                 // For hookAll=true, treat it as if h was NULL
                 HDC hdc = GetDC(nullptr);
@@ -398,7 +398,7 @@ void SyncCursorImage() {
 
                 std::vector<uint8_t> datawith8bitbytes = {};
                 if (cachedcursors[callback.first].find(hash) != cachedcursors[callback.first].end()) {
-                    callback.second(CURSOR_UPDATED_CACHED, hash, {});
+                    callback.second(CPP_CURSOR_UPDATED_CACHED, hash, {});
                 }
                 else {
                     if (datawith8bitbytes.size() == 0) {
@@ -406,7 +406,7 @@ void SyncCursorImage() {
                             ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
                     }
                     cachedcursors[callback.first].insert(hash);
-                    callback.second(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
+                    callback.second(CPP_CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
                 }
             }
         }
@@ -423,7 +423,7 @@ void SyncCursorImage() {
         std::vector<uint8_t> datawith8bitbytes = {};
         for (auto callback : callbacks) {
             if (cachedcursors[callback.first].find(hash) != cachedcursors[callback.first].end()) {
-                callback.second(CURSOR_UPDATED_CACHED, hash, {});
+                callback.second(CPP_CURSOR_UPDATED_CACHED, hash, {});
             }
             else {
                 if (datawith8bitbytes.size() == 0) {
@@ -431,7 +431,7 @@ void SyncCursorImage() {
                         ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
                 }
                 cachedcursors[callback.first].insert(hash);
-                callback.second(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
+                callback.second(CPP_CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
             }
         }
     }
@@ -449,12 +449,12 @@ void CursorChangedEventProc(HWINEVENTHOOK hook,
         switch (event) {
         case EVENT_OBJECT_HIDE:
             for (auto callback : callbacks) {
-                callback.second(CURSOR_INVISIBLE, 0, {});
+                callback.second(CPP_CURSOR_INVISIBLE, 0, {});
             }
             break;
         case EVENT_OBJECT_SHOW:
             for (auto callback : callbacks) {
-                callback.second(CURSOR_VISIBLE, 0, {});
+                callback.second(CPP_CURSOR_VISIBLE, 0, {});
             }
             SyncCursorImage();
             break;
@@ -493,7 +493,7 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
         unsigned int hash = JSHash(image.get(), width * height);
         std::vector<uint8_t> datawith8bitbytes = ConvertUint32ToUint8(image.get(), width, height, hotX, hotY, hash);
         cachedcursors[callback_id].insert(hash);
-        callback(CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
+        callback(CPP_CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
     }
 }
 
