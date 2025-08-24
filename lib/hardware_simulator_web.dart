@@ -6,8 +6,6 @@
 import 'package:hardware_simulator/hardware_simulator_platform_interface.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
-import 'dart:html';
-import 'dart:js_util' as js_util;
 
 /// A web implementation of the HardwareSimulatorPlatform of the HardwareSimulator plugin.
 class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
@@ -16,6 +14,12 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
 
   static void registerWith(Registrar registrar) {
     HardwareSimulatorPlatform.instance = HardwareSimulatorPluginWeb();
+    //取消右键菜单
+    web.EventStreamProviders.contextMenuEvent
+        .forTarget(web.document)
+        .listen((event) {
+      event.preventDefault(); // 阻止默认的右键菜单
+    });
   }
 
   /// Returns a [String] containing the version of the platform.
@@ -27,21 +31,17 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
 
   @override
   Future<int?> getMonitorCount() async {
-    //顺便取消右键菜单
-    document.onContextMenu.listen((event) {
-      event.preventDefault(); // 阻止默认的右键菜单
-    });
     return 1;
   }
 
   @override
   Future<void> lockCursor() async {
-    js_util.callMethod(document.body!, 'requestPointerLock', []);
+    web.document.body?.requestPointerLock();
   }
 
   @override
   Future<void> unlockCursor() async {
-    js_util.callMethod(document, 'exitPointerLock', []);
+    web.document.exitPointerLock();
   }
 
   bool isinitialized = false;
@@ -56,16 +56,20 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
 
   void init() {
     // 监听鼠标移动事件
-    document.onMouseMove.listen((event) {
+    web.EventStreamProviders.mouseMoveEvent
+        .forTarget(web.document)
+        .listen((event) {
       // 使用 movementX 和 movementY 获取相对位移
-      double dx = event.movement.x.toDouble();
-      double dy = event.movement.y.toDouble();
+      double dx = event.movementX.toDouble();
+      double dy = event.movementY.toDouble();
       for (var callback in cursorMovedCallbacks) {
         callback(dx, dy);
       }
     });
 
-    document.onMouseWheel.listen((event) {
+    web.EventStreamProviders.wheelEvent
+        .forTarget(web.document)
+        .listen((event) {
       double dx = event.deltaX.toDouble();
       double dy = event.deltaY.toDouble();
       for (var callback in cursorWheelCallbacks) {
@@ -73,7 +77,9 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
       }
     });
 
-    document.onMouseDown.listen((event) {
+    web.EventStreamProviders.mouseDownEvent
+        .forTarget(web.document)
+        .listen((event) {
       int buttonId = event.button;
       if (webToWindowsMouseButtonMap.containsKey(buttonId)) {
         buttonId = webToWindowsMouseButtonMap[buttonId]!;
@@ -83,7 +89,9 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
       }
     });
 
-    document.onMouseUp.listen((event) {
+    web.EventStreamProviders.mouseUpEvent
+        .forTarget(web.document)
+        .listen((event) {
       int buttonId = event.button;
       if (webToWindowsMouseButtonMap.containsKey(buttonId)) {
         buttonId = webToWindowsMouseButtonMap[buttonId]!;
@@ -97,7 +105,9 @@ class HardwareSimulatorPluginWeb extends HardwareSimulatorPlatform {
     //You also need to care about engine/src/flutter/lib/web_ui/lib/src/engine/keyboard_binding.dart
     //to cancel the guard. CloudPlayPlus does not need this, you can do it as you like.
     //Currently I don't know why the fix does not work for my macbook.
-    /*document.onKeyDown.listen((event){
+    /*web.EventStreamProviders.keyDownEvent
+        .forTarget(web.document)
+        .listen((event){
       for (var callback in keyPressedCallbacks){
         callback(event.keyCode,true);
       }
