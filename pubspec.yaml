@@ -1,7 +1,8 @@
 name: hardware_simulator
-description: "A new Flutter plugin project."
+description: "A Flutter plugin project which simulates the hardware of the computer."
 version: 0.0.1
-homepage:
+homepage: www.cloudplayplus.com
+publish_to: none
 
 environment:
   sdk: '>=3.2.0-162.0.dev <4.0.0'
@@ -14,6 +15,10 @@ dependencies:
   web: ^1.0.0
   flutter_web_plugins:
     sdk: flutter
+  pointer_lock:
+    git:
+      url: https://github.com/zhuhaichao518/pointer_lock.git
+      ref: main
 
 dev_dependencies:
   flutter_test:

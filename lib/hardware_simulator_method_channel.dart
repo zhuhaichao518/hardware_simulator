@@ -2,6 +2,8 @@ import 'dart:io' /* if (dart.library.js) 'dart:html'*/;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:pointer_lock/pointer_lock.dart';
+import 'dart:async';
 
 import 'hardware_simulator_platform_interface.dart';
 
@@ -12,14 +14,16 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   final methodChannel = const MethodChannel('hardware_simulator');
   bool isinitialized = false;
 
+  // pointer lock on windows and linux.
+  StreamSubscription<PointerLockMoveEvent>? _pointerLockSubscription;
+
   void init() {
     methodChannel.setMethodCallHandler((call) async {
       if (call.method == "onCursorMoved") {
         for (var callback in cursorMovedCallbacks) {
           callback(call.arguments['dx'], call.arguments['dy']);
         }
-      }
-      else if (call.method == "onCursorButton") {
+      } else if (call.method == "onCursorButton") {
         for (var callback in cursorPressedCallbacks) {
           callback(call.arguments['buttonId'], call.arguments['isDown']);
         }
@@ -29,13 +33,11 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
         for (var callback in keyBoardPressedCallbacks) {
           callback(call.arguments['buttonId'], call.arguments['isDown']);
         }
-      }
-      else if (call.method == "onCursorScroll") {
+      } else if (call.method == "onCursorScroll") {
         for (var callback in cursorWheelCallbacks) {
           callback(call.arguments['dx'], call.arguments['dy']);
         }
-      }
-      else if (call.method == "onCursorImageMessage") {
+      } else if (call.method == "onCursorImageMessage") {
         int callbackID = call.arguments['callbackID'];
         if (cursorImageCallbacks.containsKey(callbackID)) {
           cursorImageCallbacks[callbackID]!(call.arguments['message'],
@@ -60,13 +62,44 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> lockCursor() async {
-    await methodChannel.invokeMethod('lockCursor');
+    // use pointer_lock on windows and linux.
+    if (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      await _pointerLockSubscription?.cancel();
+
+      _pointerLockSubscription = pointerLock
+          .createSession(
+        windowsMode: PointerLockWindowsMode.capture,
+        cursor: PointerLockCursor.hidden,
+        unlockOnPointerUp: false, // 手动控制解锁
+      )
+          .listen(
+        (event) {
+          for (var callback in cursorMovedCallbacks) {
+            callback(event.delta.dx, event.delta.dy);
+          }
+        },
+        onError: (error) {
+          print('Pointer lock error: $error');
+        },
+        onDone: () {
+          _pointerLockSubscription = null;
+        },
+      );
+    } else {
+      await methodChannel.invokeMethod('lockCursor');
+    }
   }
 
   @override
   Future<void> unlockCursor() async {
-    // if not implemented, just care about main monitor.
-    await methodChannel.invokeMethod('unlockCursor');
+    if (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      await _pointerLockSubscription?.cancel();
+      _pointerLockSubscription = null;
+    } else {
+      await methodChannel.invokeMethod('unlockCursor');
+    }
   }
 
   @override
@@ -283,7 +316,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       <String, dynamic>{'id': controllerId, 'action': action},
     );
   }
-  
+
   @override
   Future<bool> initParsecVdd() async {
     return await methodChannel.invokeMethod('initParsecVdd');
