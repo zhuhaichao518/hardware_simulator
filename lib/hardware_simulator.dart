@@ -85,6 +85,10 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.isRunningAsSystem();
   }
 
+  static Future<bool> putImmersiveModeEnabled(bool enabled) {
+    return HardwareSimulatorPlatform.instance.putImmersiveModeEnabled(enabled);
+  }
+
   static Future<void> showNotification(String content) {
     return HardwareSimulatorPlatform.instance.showNotification(content);
   }
@@ -122,6 +126,14 @@ class HardwareSimulator {
 
   static void removeKeyboardPressed(CursorPressedCallback callback) {
     HardwareSimulatorPlatform.instance.removeKeyboardPressed(callback);
+  }
+
+  static void addKeyBlocked(KeyBlockedCallback callback) {
+    HardwareSimulatorPlatform.instance.addKeyBlocked(callback);
+  }
+
+  static void removeKeyBlocked(KeyBlockedCallback callback) {
+    HardwareSimulatorPlatform.instance.removeKeyBlocked(callback);
   }
 
   static void addCursorWheel(CursorWheelCallback callback) {
