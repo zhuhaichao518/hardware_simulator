@@ -3,6 +3,7 @@
 #include "cursor_monitor.h"
 #include "gamecontroller_manager.h"
 #include "notification_window.h"
+#include "virtual_display_control.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -24,7 +25,6 @@
 #include <shellapi.h>
 #include <shlwapi.h>  // PathCombineW, PathRemoveFileSpecW
 #include <string>
-#include "parsec-vdd.h"
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -46,8 +46,6 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
-
-static HANDLE g_parsec = nullptr;
 
 // auto repeat feature
 struct KeyState {
@@ -933,9 +931,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         );
         result->Success(nullptr);
   } else if (method_call.method_name().compare("initParsecVdd") == 0) {
-    if (g_parsec == nullptr) {
-      g_parsec = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
-      if (g_parsec != nullptr && g_parsec != INVALID_HANDLE_VALUE) {
+    if (!VirtualDisplayControl::IsInitialized()) {
+      if (VirtualDisplayControl::Initialize()) {
         result->Success(flutter::EncodableValue(true));
       } else {
         result->Error("INIT_FAILED", "Failed to initialize ParsecVdd");
@@ -944,8 +941,8 @@ void HardwareSimulatorPlugin::HandleMethodCall(
       result->Success(flutter::EncodableValue(true));
     }
   } else if (method_call.method_name().compare("createDisplay") == 0) {
-     if (g_parsec) {
-         int displayId = parsec_vdd::VddAddDisplay(g_parsec);
+     if (VirtualDisplayControl::IsInitialized()) {
+         int displayId = VirtualDisplayControl::AddDisplay();
          if (displayId >= 0) {
              result->Success(flutter::EncodableValue(displayId));
          } else {
@@ -955,13 +952,200 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
   } else if (method_call.method_name().compare("removeDisplay") == 0) {
-     auto displayId = (args->find(flutter::EncodableValue("displayId")))->second;
-     if (g_parsec) {
-         parsec_vdd::VddRemoveDisplay(g_parsec, static_cast<int>(std::get<int>((displayId))));
+     auto displayId_iter = args->find(flutter::EncodableValue("displayUid"));
+     if (displayId_iter == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
+         return;
+     }
+     auto displayId = displayId_iter->second;
+     if (VirtualDisplayControl::IsInitialized()) {
+        VirtualDisplayControl::RemoveDisplay(static_cast<int>(std::get<int>((displayId))));
          result->Success(flutter::EncodableValue(true));
      } else {
          result->Error("NOT_INITIALIZED", "Parsec not initialized");
      }
+  } else if (method_call.method_name().compare("checkVddStatus") == 0) {
+     bool status = VirtualDisplayControl::CheckVddStatus();
+     result->Success(flutter::EncodableValue(status));
+  } else if (method_call.method_name().compare("getAllDisplays") == 0) {
+     int displayCount = VirtualDisplayControl::GetAllDisplays();
+     result->Success(flutter::EncodableValue(displayCount));
+  } else if (method_call.method_name().compare("getDisplayList") == 0) {
+     flutter::EncodableList displayList;
+     auto displays = VirtualDisplayControl::GetDetailedDisplayList();
+     
+     for (const auto& display : displays) {
+         flutter::EncodableMap displayMap;
+         displayMap[flutter::EncodableValue("index")] = flutter::EncodableValue(display.index);
+         displayMap[flutter::EncodableValue("width")] = flutter::EncodableValue(display.width);
+         displayMap[flutter::EncodableValue("height")] = flutter::EncodableValue(display.height);
+         displayMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(display.refresh_rate);
+         displayMap[flutter::EncodableValue("active")] = flutter::EncodableValue(display.active);
+         displayMap[flutter::EncodableValue("displayUid")] = flutter::EncodableValue(display.display_uid);
+         displayMap[flutter::EncodableValue("deviceName")] = flutter::EncodableValue(display.device_name);
+         displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
+         displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
+         displayMap[flutter::EncodableValue("orientation")] = flutter::EncodableValue(display.orientation);
+         
+         displayList.push_back(flutter::EncodableValue(displayMap));
+     }
+     
+     result->Success(flutter::EncodableValue(displayList));
+  } else if (method_call.method_name().compare("changeDisplaySettings") == 0) {
+     // Change display settings
+     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+     if (!arguments) {
+         result->Error("INVALID_ARGUMENTS", "Arguments must be a map");
+         return;
+     }
+
+     // Get display uid
+     auto uid_it = arguments->find(flutter::EncodableValue("displayUid"));
+     if (uid_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
+         return;
+     }
+     int display_uid = std::get<int>(uid_it->second);
+
+     // Get new configuration
+     auto width_it = arguments->find(flutter::EncodableValue("width"));
+     auto height_it = arguments->find(flutter::EncodableValue("height"));
+     auto refresh_rate_it = arguments->find(flutter::EncodableValue("refreshRate"));
+     
+     if (width_it == arguments->end() || height_it == arguments->end() || refresh_rate_it == arguments->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing width, height, or refreshRate arguments");
+         return;
+     }
+     
+     VirtualDisplay::DisplayConfig new_config;
+     new_config.width = std::get<int>(width_it->second);
+     new_config.height = std::get<int>(height_it->second);
+     new_config.refresh_rate = std::get<int>(refresh_rate_it->second);
+     
+     bool success = VirtualDisplayControl::ChangeDisplaySettings(display_uid, new_config);
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getDisplayConfigs") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     if (display_uid_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'displayUid' argument");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     
+     auto displays = VirtualDisplayControl::GetDetailedDisplayList();
+     auto it = std::find_if(displays.begin(), displays.end(),
+         [display_uid](const VirtualDisplayControl::DetailedDisplayInfo& display) {
+             return display.display_uid == display_uid;
+         });
+     
+     if (it == displays.end()) {
+         result->Error("DISPLAY_NOT_FOUND", "Display not found");
+         return;
+     }
+     
+     flutter::EncodableList configList;
+     auto configs = VirtualDisplayControl::GetDisplayConfigs(display_uid);
+     for (const auto& config : configs) {
+         flutter::EncodableMap configMap;
+         configMap[flutter::EncodableValue("width")] = flutter::EncodableValue(config.width);
+         configMap[flutter::EncodableValue("height")] = flutter::EncodableValue(config.height);
+         configMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(config.refresh_rate);
+         configList.push_back(flutter::EncodableValue(configMap));
+     }
+     
+     result->Success(flutter::EncodableValue(configList));
+  } else if (method_call.method_name().compare("getCustomDisplayConfigs") == 0) {
+     auto configs = VirtualDisplayControl::GetCustomDisplayConfigs();
+     
+     flutter::EncodableList configList;
+     for (const auto& config : configs) {
+         flutter::EncodableMap configMap;
+         configMap[flutter::EncodableValue("width")] = flutter::EncodableValue(config.width);
+         configMap[flutter::EncodableValue("height")] = flutter::EncodableValue(config.height);
+         configMap[flutter::EncodableValue("refreshRate")] = flutter::EncodableValue(config.refresh_rate);
+         configList.push_back(flutter::EncodableValue(configMap));
+     }
+     
+     result->Success(flutter::EncodableValue(configList));
+  } else if (method_call.method_name().compare("setCustomDisplayConfigs") == 0) {
+     auto configs_it = args->find(flutter::EncodableValue("configs"));
+     if (configs_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing 'configs' argument");
+         return;
+     }
+     
+     auto configs_list = std::get<flutter::EncodableList>(configs_it->second);
+     std::vector<VirtualDisplay::DisplayConfig> configs;
+     
+     for (const auto& item : configs_list) {
+         auto config_map = std::get<flutter::EncodableMap>(item);
+         
+         auto width_it = config_map.find(flutter::EncodableValue("width"));
+         auto height_it = config_map.find(flutter::EncodableValue("height"));
+         auto refresh_rate_it = config_map.find(flutter::EncodableValue("refreshRate"));
+         
+         if (width_it != config_map.end() && height_it != config_map.end() && refresh_rate_it != config_map.end()) {
+             VirtualDisplay::DisplayConfig config;
+             config.width = std::get<int>(width_it->second);
+             config.height = std::get<int>(height_it->second);
+             config.refresh_rate = std::get<int>(refresh_rate_it->second);
+             configs.push_back(config);
+         }
+     }
+     
+     bool success = VirtualDisplayControl::SetCustomDisplayConfigs(configs);
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("setDisplayOrientation") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     auto orientation_it = args->find(flutter::EncodableValue("orientation"));
+     
+     if (display_uid_it == args->end() || orientation_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing required arguments");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     int orientation = std::get<int>(orientation_it->second);
+     
+     bool success = VirtualDisplayControl::SetDisplayOrientation(display_uid, 
+                                                                  static_cast<VirtualDisplay::Orientation>(orientation));
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getDisplayOrientation") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     
+     if (display_uid_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing displayUid argument");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     VirtualDisplay::Orientation orientation = VirtualDisplayControl::GetDisplayOrientation(display_uid);
+     
+     result->Success(flutter::EncodableValue(static_cast<int>(orientation)));
+  } else if (method_call.method_name().compare("setMultiDisplayMode") == 0) {
+     auto mode_it = args->find(flutter::EncodableValue("mode"));
+     auto primary_id_it = args->find(flutter::EncodableValue("primaryDisplayId"));
+     
+     if (mode_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing mode argument");
+         return;
+     }
+     
+     int mode = std::get<int>(mode_it->second);
+     int primary_display_id = 0;
+     if (primary_id_it != args->end()) {
+         primary_display_id = std::get<int>(primary_id_it->second);
+     }
+     
+     bool success = VirtualDisplayControl::SetMultiDisplayMode(
+         static_cast<VirtualDisplayControl::MultiDisplayMode>(mode), 
+         primary_display_id);
+     
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("getCurrentMultiDisplayMode") == 0) {
+     VirtualDisplayControl::MultiDisplayMode mode = VirtualDisplayControl::GetCurrentMultiDisplayMode();
+     result->Success(flutter::EncodableValue(static_cast<int>(mode)));
   } else {
     result->NotImplemented();
   }

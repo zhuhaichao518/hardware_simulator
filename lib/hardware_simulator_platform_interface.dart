@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'hardware_simulator_method_channel.dart';
+import 'display_data.dart';
 
 typedef CursorMovedCallback = void Function(double x, double y);
 typedef CursorPressedCallback = void Function(int button, bool isDown);
@@ -175,7 +176,48 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('createDisplay() has not been implemented.');
   }
 
-  Future<bool> removeDisplay(int displayId) {
+  Future<bool> removeDisplay(int displayUid) {
     throw UnimplementedError('removeDisplay() has not been implemented.');
+  }
+
+  Future<int> getAllDisplays() {
+    throw UnimplementedError('getAllDisplays() has not been implemented.');
+  }
+
+  Future<List<DisplayData>> getDisplayList() {
+    throw UnimplementedError('getDisplayList() has not been implemented.');
+  }
+
+  Future<bool> changeDisplaySettings(int displayUid, int width, int height, int refreshRate, {int? bitDepth}) {
+    throw UnimplementedError('changeDisplaySettings() has not been implemented.');
+  }
+
+  Future<List<Map<String, dynamic>>> getDisplayConfigs(int displayUid) {
+    throw UnimplementedError('getDisplayConfigs() has not been implemented.');
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomDisplayConfigs() {
+    throw UnimplementedError('getCustomDisplayConfigs() has not been implemented.');
+  }
+
+  Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
+    throw UnimplementedError('setCustomDisplayConfigs() has not been implemented.');
+  }
+
+  Future<bool> setDisplayOrientation(int displayUid, int orientation) {
+    throw UnimplementedError('setDisplayOrientation() has not been implemented.');
+  }
+
+  Future<int> getDisplayOrientation(int displayUid) {
+    throw UnimplementedError('getDisplayOrientation() has not been implemented.');
+  }
+
+  // Multi-display mode management
+  Future<bool> setMultiDisplayMode(int mode, int primaryDisplayId) {
+    throw UnimplementedError('setMultiDisplayMode() has not been implemented.');
+  }
+
+  Future<int> getCurrentMultiDisplayMode() {
+    throw UnimplementedError('getCurrentMultiDisplayMode() has not been implemented.');
   }
 }

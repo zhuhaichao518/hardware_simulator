@@ -8,6 +8,7 @@ import 'package:hardware_simulator/hardware_simulator.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'fps_game_example.dart';
+import 'display_manager_page.dart';
 
 void main() {
   //SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
@@ -243,53 +244,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.performTouchEvent(x, y, touchId, false, 0);
   }
 
-  int _currentDisplayId = -1; // 存储当前创建的显示器ID
-
-  void createDisplay() async {
-    try {
-      // First initialize parsec-vdd
-      bool initialized = await HardwareSimulator.initParsecVdd();
-      print('parsec-vdd initialized: $initialized');
-
-      if (initialized) {
-        var res1 = await HardwareSimulator.createDisplay();
-        print(
-          '_billdSimulatorPlugin.createDisplay Ok, display ID: $res1',
-        );
-        setState(() {
-          _currentDisplayId = res1;
-        });
-      } else {
-        print('Failed to initialize parsec-vdd');
-      }
-    } catch (e) {
-      print('Errorrr: $e');
-    }
-  }
-
-  void removeDisplay() async {
-    try {
-      if(_currentDisplayId==-1){
-        return;
-      }
-      bool removed =
-          await HardwareSimulator.removeDisplay(_currentDisplayId);
-      if (removed) {
-        print(
-          'Display $_currentDisplayId removed successfully',
-        );
-        setState(() {
-          _currentDisplayId = -1;
-        });
-      } else {
-        print(
-          'Failed to remove display $_currentDisplayId',
-        );
-      }
-    } catch (e) {
-      print('Error removing display: $e');
-    }
-  }
+  
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +261,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             );
           },
           child: Text('进入FPS游戏示例'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            textStyle: TextStyle(fontSize: 18),
+          ),
+        ),
+        SizedBox(height: 10),
+        // 添加导航按钮到显示器管理页面
+        ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => DisplayManagerPage()),
+            );
+          },
+          child: Text('显示器管理'),
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             textStyle: TextStyle(fontSize: 18),
@@ -455,21 +426,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
               onPressed: _touchUp,
               child: Text('Touch Up'),
-            ),
-          ],
-        ),
-        SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: createDisplay,
-              child: Text('createDisplay'),
-            ),
-            SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: removeDisplay,
-              child: Text('removeDisplay: $_currentDisplayId'),
             ),
           ],
         ),

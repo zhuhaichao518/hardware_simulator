@@ -1,5 +1,5 @@
 import 'hardware_simulator_platform_interface.dart';
-import 'package:flutter/services.dart';
+import 'display_data.dart';
 
 class HWKeyboard {
   HWKeyboard();
@@ -53,8 +53,6 @@ class GameController {
 }
 
 class HardwareSimulator {
-  static const MethodChannel _channel = MethodChannel('hardware_simulator');
-
   //For keyboard and mouse, it is a singleton. For other hardwares like game controllers,
   //it should be plugged in and then used.
   static HWKeyboard keyboard = HWKeyboard();
@@ -187,7 +185,70 @@ class HardwareSimulator {
     return HardwareSimulatorPlatform.instance.createDisplay();
   }
 
-  static Future<bool> removeDisplay(int displayId) {
-    return HardwareSimulatorPlatform.instance.removeDisplay(displayId);
+  static Future<bool> removeDisplay(int displayUid) {
+    return HardwareSimulatorPlatform.instance.removeDisplay(displayUid);
   }
+
+  static Future<int> getAllDisplays() {
+    return HardwareSimulatorPlatform.instance.getAllDisplays();
+  }
+
+  static Future<List<DisplayData>> getDisplayList() {
+    return HardwareSimulatorPlatform.instance.getDisplayList();
+  }
+
+  static Future<bool> changeDisplaySettings(int displayUid, int width, int height, int refreshRate, {int? bitDepth}) {
+    return HardwareSimulatorPlatform.instance.changeDisplaySettings(displayUid, width, height, refreshRate, bitDepth: bitDepth);
+  }
+
+  static Future<List<Map<String, dynamic>>> getDisplayConfigs(int displayUid) {
+    return HardwareSimulatorPlatform.instance.getDisplayConfigs(displayUid);
+  }
+
+  static Future<List<Map<String, dynamic>>> getCustomDisplayConfigs() {
+    return HardwareSimulatorPlatform.instance.getCustomDisplayConfigs();
+  }
+
+  static Future<bool> setCustomDisplayConfigs(List<Map<String, dynamic>> configs) {
+    return HardwareSimulatorPlatform.instance.setCustomDisplayConfigs(configs);
+  }
+
+  // Display orientation management
+  static Future<bool> setDisplayOrientation(int displayUid, DisplayOrientation orientation) {
+    return HardwareSimulatorPlatform.instance.setDisplayOrientation(displayUid, orientation.index);
+  }
+
+  static Future<DisplayOrientation> getDisplayOrientation(int displayUid) async {
+    int orientationIndex = await HardwareSimulatorPlatform.instance.getDisplayOrientation(displayUid);
+    return DisplayOrientation.values[orientationIndex];
+  }
+
+  // Multi-display mode management
+  static Future<bool> setMultiDisplayMode(MultiDisplayMode mode, {int primaryDisplayId = 0}) {
+    return HardwareSimulatorPlatform.instance.setMultiDisplayMode(mode.index, primaryDisplayId);
+  }
+
+  static Future<MultiDisplayMode> getCurrentMultiDisplayMode() async {
+    int modeIndex = await HardwareSimulatorPlatform.instance.getCurrentMultiDisplayMode();
+    if (modeIndex >= 0 && modeIndex < MultiDisplayMode.values.length) {
+      return MultiDisplayMode.values[modeIndex];
+    }
+    return MultiDisplayMode.unknown;
+  }
+}
+
+// Enums for display management
+enum DisplayOrientation {
+  landscape,        // Angle0
+  portrait,         // Angle90
+  landscapeFlipped, // Angle180
+  portraitFlipped   // Angle270
+}
+
+enum DisplayTopologyMode {
+  extend,    // Extend desktop
+  duplicate, // Mirror/Duplicate displays
+  internal,  // Internal display only
+  external,  // External display only
+  clone      // Clone mode
 }
