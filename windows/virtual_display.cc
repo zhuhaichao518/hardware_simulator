@@ -73,6 +73,61 @@ void VirtualDisplay::FetchAllDisplayConfigs() {
               });
 }
 
+void VirtualDisplay::UpdateDisplayBounds() {
+    std::wstring device_name_w(info_.device_name.begin(), info_.device_name.end());
+    
+    DEVMODEW dev_mode = {};
+    dev_mode.dmSize = sizeof(DEVMODEW);
+    
+    if (EnumDisplaySettingsW(device_name_w.c_str(), ENUM_CURRENT_SETTINGS, &dev_mode)) {
+        info_.left = static_cast<int>(dev_mode.dmPosition.x);
+        info_.top = static_cast<int>(dev_mode.dmPosition.y);
+        info_.right = info_.left + static_cast<int>(dev_mode.dmPelsWidth);
+        info_.bottom = info_.top + static_cast<int>(dev_mode.dmPelsHeight);
+        
+        DISPLAY_DEVICEW display_device = {};
+        display_device.cb = sizeof(DISPLAY_DEVICEW);
+        
+        for (DWORD device_index = 0; EnumDisplayDevicesW(nullptr, device_index, &display_device, 0); device_index++) {
+            if (wcscmp(display_device.DeviceName, device_name_w.c_str()) == 0) {
+                info_.is_primary = (display_device.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) != 0;
+                break;
+            }
+        }
+    } else {
+        HMONITOR monitor = nullptr;
+        auto params = std::make_pair(&device_name_w, &monitor);
+        
+        EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT, LPARAM lParam) -> BOOL {
+            auto* params = reinterpret_cast<std::pair<std::wstring*, HMONITOR*>*>(lParam);
+            
+            MONITORINFOEXW monitor_info = {};
+            monitor_info.cbSize = sizeof(MONITORINFOEXW);
+            
+            if (GetMonitorInfoW(hMon, &monitor_info)) {
+                if (wcscmp(monitor_info.szDevice, params->first->c_str()) == 0) {
+                    *(params->second) = hMon;
+                    return FALSE;
+                }
+            }
+            return TRUE;
+        }, reinterpret_cast<LPARAM>(&params));
+        
+        if (monitor) {
+            MONITORINFOEXW monitor_info = {};
+            monitor_info.cbSize = sizeof(MONITORINFOEXW);
+            
+            if (GetMonitorInfoW(monitor, &monitor_info)) {
+                info_.left = monitor_info.rcMonitor.left;
+                info_.top = monitor_info.rcMonitor.top;
+                info_.right = monitor_info.rcMonitor.right;
+                info_.bottom = monitor_info.rcMonitor.bottom;
+                info_.is_primary = (monitor_info.dwFlags & MONITORINFOF_PRIMARY) != 0;
+            }
+        }
+    }
+}
+
 const std::vector<VirtualDisplay::DisplayConfig>& VirtualDisplay::GetDisplayConfigList() const {
     const_cast<VirtualDisplay*>(this)->FetchAllDisplayConfigs();
     return display_config_list_;

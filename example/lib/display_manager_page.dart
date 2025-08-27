@@ -35,7 +35,8 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
         for (var display in displays) {
           //print display all details
           print('Display ID: ${display.index}, Resolution: ${display.width}x${display.height}, Refresh Rate: ${display.refreshRate}Hz'
-          ', Virtual: ${display.isVirtual}, Name: ${display.displayName}, Device: ${display.deviceName}, Active: ${display.active}, UID: ${display.displayUid}');
+          ', Virtual: ${display.isVirtual}, Name: ${display.displayName}, Device: ${display.deviceName}, Active: ${display.active}, UID: ${display.displayUid}'
+          ', Coordinates: (${display.left}, ${display.top}) - (${display.right}, ${display.bottom}), Primary: ${display.isPrimary}');
         }
 
     } catch (e) {
@@ -318,6 +319,8 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('当前配置: ${display.width}x${display.height}@${display.refreshRate}Hz'),
+                Text('坐标位置: (${display.left}, ${display.top}) - (${display.right}, ${display.bottom})'),
+                if (display.isPrimary) Text('主显示器', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
                 SizedBox(height: 16),
                 Text('可用配置数量: ${availableConfigs.length}'),
                 SizedBox(height: 16),
@@ -684,7 +687,9 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                     margin: EdgeInsets.only(bottom: 8.0),
                     child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: display.isVirtual ? Colors.blue : Colors.green,
+                          backgroundColor: display.isPrimary 
+                              ? Colors.orange 
+                              : (display.isVirtual ? Colors.blue : Colors.green),
                           child: Text('${display.index}'),
                         ),
                         title: Text(display.displayName),
@@ -693,8 +698,10 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                           children: [
                             Text('分辨率: ${display.width}x${display.height}'),
                             Text('刷新率: ${display.refreshRate}Hz'),
-                            Text('类型: ${display.isVirtual ? "虚拟显示器" : "物理显示器"}'),
+                            Text('类型: ${display.isVirtual ? "虚拟显示器" : "物理显示器"}${display.isPrimary ? " (主显示器)" : ""}'),
                             Text('方向: ${_getOrientationName(display.orientation)}'),
+                            Text('坐标: (${display.left}, ${display.top}) - (${display.right}, ${display.bottom})'),
+                            Text('设备: ${display.deviceName}'),
                           ],
                         ),
                         trailing: Row(

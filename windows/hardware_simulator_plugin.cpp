@@ -986,6 +986,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
          displayMap[flutter::EncodableValue("displayName")] = flutter::EncodableValue(display.display_name);
          displayMap[flutter::EncodableValue("isVirtual")] = flutter::EncodableValue(display.is_virtual);
          displayMap[flutter::EncodableValue("orientation")] = flutter::EncodableValue(display.orientation);
+         displayMap[flutter::EncodableValue("left")] = flutter::EncodableValue(display.left);
+         displayMap[flutter::EncodableValue("top")] = flutter::EncodableValue(display.top);
+         displayMap[flutter::EncodableValue("right")] = flutter::EncodableValue(display.right);
+         displayMap[flutter::EncodableValue("bottom")] = flutter::EncodableValue(display.bottom);
+         displayMap[flutter::EncodableValue("isPrimary")] = flutter::EncodableValue(display.is_primary);
          
          displayList.push_back(flutter::EncodableValue(displayMap));
      }
