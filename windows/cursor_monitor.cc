@@ -437,6 +437,93 @@ void SyncCursorImage() {
     }
 }
 
+struct MousePosition {
+    int screenId;
+    float xPercent;
+    float yPercent;
+};
+
+MousePosition GetMousePositionAndScreenId() {
+    POINT cursorPos;
+    GetCursorPos(&cursorPos);
+
+    HMONITOR hMonitor = MonitorFromPoint(cursorPos, MONITOR_DEFAULTTONEAREST);
+
+    MONITORINFOEX monitorInfo;
+    monitorInfo.cbSize = sizeof(MONITORINFOEX);
+    GetMonitorInfo(hMonitor, &monitorInfo);
+
+    static std::vector<RECT> monitors;
+    static bool monitorsInitialized = false;
+
+    if (!monitorsInitialized) {
+        monitors.clear();
+        EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
+            auto& list = *reinterpret_cast<std::vector<RECT>*>(data);
+            MONITORINFO info{ sizeof(MONITORINFO) };
+            GetMonitorInfo(hMon, &info);
+            list.push_back(info.rcMonitor);
+            return TRUE;
+        }, reinterpret_cast<LPARAM>(&monitors));
+        monitorsInitialized = true;
+    }
+
+    int screenId = 0;
+    for (size_t i = 0; i < monitors.size(); ++i) {
+        if (monitors[i].left == monitorInfo.rcMonitor.left && 
+            monitors[i].top == monitorInfo.rcMonitor.top &&
+            monitors[i].right == monitorInfo.rcMonitor.right && 
+            monitors[i].bottom == monitorInfo.rcMonitor.bottom) {
+            screenId = static_cast<int>(i);
+            break;
+        }
+    }
+
+    float xPercent = (cursorPos.x - monitorInfo.rcMonitor.left) / 
+                     (float)(monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left);
+    float yPercent = (cursorPos.y - monitorInfo.rcMonitor.top) / 
+                     (float)(monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top);
+    
+    //xPercent = std::max(0.0f, std::min(1.0f, xPercent));
+    //yPercent = std::max(0.0f, std::min(1.0f, yPercent));
+    
+    return {screenId, xPercent, yPercent};
+}
+
+std::vector<uint8_t> FloatToBytes(float x, float y) {
+    std::vector<uint8_t> bytes;
+    bytes.resize(sizeof(float) * 2);
+    
+    bool isLittleEndian = test_endian() == 0;
+    
+    uint8_t* xBytes = reinterpret_cast<uint8_t*>(&x);
+    uint8_t* yBytes = reinterpret_cast<uint8_t*>(&y);
+    
+    if (isLittleEndian) {
+        for (size_t i = 0; i < sizeof(float); ++i) {
+            bytes[i] = xBytes[i];
+            bytes[i + sizeof(float)] = yBytes[i];
+        }
+    } else {
+        for (size_t i = 0; i < sizeof(float); ++i) {
+            bytes[i] = xBytes[sizeof(float) - 1 - i];
+            bytes[i + sizeof(float)] = yBytes[sizeof(float) - 1 - i];
+        }
+    }
+    
+    return bytes;
+}
+
+bool IsCursorVisible() {
+    CURSORINFO ci = { 0 };
+    ci.cbSize = sizeof(CURSORINFO);
+
+    if (GetCursorInfo(&ci)) {
+        return (ci.flags & CURSOR_SUPPRESSED) == 0;
+    }
+    return true;
+}
+
 void CursorChangedEventProc(HWINEVENTHOOK hook,
     DWORD event,
     HWND hwnd,
@@ -449,12 +536,16 @@ void CursorChangedEventProc(HWINEVENTHOOK hook,
         switch (event) {
         case EVENT_OBJECT_HIDE:
             for (auto callback : callbacks) {
-                callback.second(CPP_CURSOR_INVISIBLE, 0, {});
+                MousePosition mousePos = GetMousePositionAndScreenId();
+                std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
+                callback.second(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
             }
             break;
         case EVENT_OBJECT_SHOW:
             for (auto callback : callbacks) {
-                callback.second(CPP_CURSOR_VISIBLE, 0, {});
+                MousePosition mousePos = GetMousePositionAndScreenId();
+                std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
+                callback.second(CPP_CURSOR_VISIBLE, mousePos.screenId, positionBytes);
             }
             SyncCursorImage();
             break;
@@ -479,6 +570,12 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
     callbacks[callback_id] = callback;
     hookAllCursorImage[callback_id] = hookAll;
     cachedcursors[callback_id] = {};
+
+    if (IsCursorVisible()) {
+        MousePosition mousePos = GetMousePositionAndScreenId();
+        std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
+        callback(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
+    }
 
     // If hookAll is true, trigger an immediate callback
     if (hookAll) {

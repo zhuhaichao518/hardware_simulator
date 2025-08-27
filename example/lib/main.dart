@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:hardware_simulator/hardware_simulator.dart';
 
@@ -141,6 +142,21 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             hash = hash * 256 + cursorImage[i];
           }
           updateCursorImage(cursorImage.sublist(21), width, height, hash);
+        }
+      } else if (message == HardwareSimulator.CURSOR_VISIBLE) {
+        // 获取显示器ID和鼠标位置信息
+        int screenId = messageInfo;
+        
+        // 检查是否有位置数据（新版本有8字节，旧版本可能为空）
+        if (cursorImage.isNotEmpty && cursorImage.length >= 8) {
+          ByteData byteData = ByteData.sublistView(cursorImage);
+          double xPercent = byteData.getFloat32(0, Endian.little);
+          double yPercent = byteData.getFloat32(4, Endian.little);
+          
+          print('Cursor became visible - Screen ID: $screenId, X: ${(xPercent * 100).toStringAsFixed(1)}%, Y: ${(yPercent * 100).toStringAsFixed(1)}%');
+        } else {
+          // 兼容旧版本，没有位置数据
+          print('Cursor became visible - Screen ID: $screenId (no position data)');
         }
       } else if (message == HardwareSimulator.CURSOR_UPDATED_CACHED) {
         setState(() {
