@@ -64,6 +64,13 @@ public:
         std::string device_description; // Device description
         FILETIME last_arrival;         // Last arrival time
         
+        // Display bounds coordinates
+        int left = 0;
+        int top = 0;
+        int right = 0;
+        int bottom = 0;
+        bool is_primary = false;
+        
         // Additional fields
         bool is_virtual = false;       // Whether this is a virtual display
         int orientation = 0;           // Display orientation (0=landscape, 1=portrait, 2=landscape_flipped, 3=portrait_flipped)

@@ -17,6 +17,11 @@ class DisplayData {
   final bool active;
   final int displayUid;
   final int orientation;
+  final int left;
+  final int top;
+  final int right;
+  final int bottom;
+  final bool isPrimary;
   
   DisplayData({
     required this.index,
@@ -29,6 +34,11 @@ class DisplayData {
     required this.active,
     required this.displayUid,
     required this.orientation,
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+    required this.isPrimary,
   });
   
   factory DisplayData.fromMap(Map<String, dynamic> map) {
@@ -43,6 +53,11 @@ class DisplayData {
       active: map['active'] ?? true,
       displayUid: map['displayUid'] ?? 0,
       orientation: map['orientation'] ?? 0,
+      left: map['left'] ?? 0,
+      top: map['top'] ?? 0,
+      right: map['right'] ?? 0,
+      bottom: map['bottom'] ?? 0,
+      isPrimary: map['isPrimary'] ?? false,
     );
   }
 }

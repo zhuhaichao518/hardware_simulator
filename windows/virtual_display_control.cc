@@ -449,6 +449,7 @@ int VirtualDisplayControl::GetAllDisplays() {
                     display->SetDisplayUid(d.display_uid);
                 }
                 display->SetCurrentOrientation(current_orientation_);
+                display->UpdateDisplayBounds();
 
                 displayMap[devicePath] = std::move(display);
                
@@ -559,6 +560,13 @@ std::vector<VirtualDisplayControl::DetailedDisplayInfo> VirtualDisplayControl::G
             info.display_name = display_info.display_name;
             info.device_description = display_info.device_description;
             info.last_arrival = display_info.last_arrival;
+            
+            // Copy coordinate information
+            info.left = display_info.left;
+            info.top = display_info.top;
+            info.right = display_info.right;
+            info.bottom = display_info.bottom;
+            info.is_primary = display_info.is_primary;
             
             // Set additional fields
             info.is_virtual = display_info.is_virtual;  // These are managed virtual displays

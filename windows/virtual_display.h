@@ -41,6 +41,11 @@ public:
         std::string display_name; 
         std::string device_description;   
         FILETIME last_arrival;
+        int    left          = 0;
+        int    top           = 0;
+        int    right         = 0;
+        int    bottom        = 0;
+        bool   is_primary    = false;
     };
 
 
@@ -52,6 +57,7 @@ public:
 
     bool ChangeDisplaySettings(const DisplayConfig& config);
     void FetchAllDisplayConfigs();
+    void UpdateDisplayBounds();
     DisplayConfig GetConfig() const { return config_; }
     DisplayInfo GetDisplayInfo() const { return info_; }
     int GetDisplayUid() const { return display_uid_; }
