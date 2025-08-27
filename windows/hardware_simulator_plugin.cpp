@@ -4,6 +4,7 @@
 #include "gamecontroller_manager.h"
 #include "notification_window.h"
 #include "virtual_display_control.h"
+#include "SmartKeyboardBlocker.h"
 
 // This must be included before many other Windows headers.
 #include <windows.h>
@@ -1146,9 +1147,44 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("getCurrentMultiDisplayMode") == 0) {
      VirtualDisplayControl::MultiDisplayMode mode = VirtualDisplayControl::GetCurrentMultiDisplayMode();
      result->Success(flutter::EncodableValue(static_cast<int>(mode)));
+  } else if (method_call.method_name().compare("putImmersiveModeEnabled") == 0) {
+     auto enabled = (args->find(flutter::EncodableValue("enabled")))->second;
+     bool immersive_enabled = static_cast<bool>(std::get<bool>((enabled)));
+     SetImmersiveMode(immersive_enabled);
+     result->Success(flutter::EncodableValue(true));
   } else {
     result->NotImplemented();
   }
+}
+
+void HardwareSimulatorPlugin::SetImmersiveMode(bool enabled) {
+    immersive_mode_enabled_ = enabled;
+    
+    if (enabled) {
+        // Enable immersive mode, start keyboard blocking
+        if (!SmartKeyboardBlocker::IsBlocking()) {
+            SmartKeyboardBlocker::StartBlocking();
+                              SmartKeyboardBlocker::SetCallback([this](const DWORD vk_code, bool isDown) {
+                      OnKeyBlocked(vk_code, isDown);
+                  });
+        }
+    } else {
+        // Disable immersive mode, stop keyboard blocking
+        SmartKeyboardBlocker::StopBlocking();
+        SmartKeyboardBlocker::SetCallback(nullptr);
+    }
+}
+
+void HardwareSimulatorPlugin::OnKeyBlocked(const DWORD vk_code, bool isDown) {
+    // Notify Dart layer via method channel that a key was blocked
+    if (channel_) {
+        flutter::EncodableMap message;
+        message[flutter::EncodableValue("keyCode")] = flutter::EncodableValue(static_cast<int>(vk_code));
+        message[flutter::EncodableValue("isDown")] = flutter::EncodableValue(isDown);
+        
+        channel_->InvokeMethod("onKeyBlocked", 
+            std::make_unique<flutter::EncodableValue>(message));
+    }
 }
 
 }  // namespace hardware_simulator

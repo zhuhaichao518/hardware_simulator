@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <thread>
+#include "SmartKeyboardBlocker.h"
 
 namespace hardware_simulator {
 
@@ -29,9 +30,15 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
+  // Immersive mode management
+  void SetImmersiveMode(bool enabled);
+  bool IsImmersiveModeEnabled() const { return immersive_mode_enabled_; }
+  void OnKeyBlocked(const DWORD vk_code, bool isDown);
+
  private:
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   std::unique_ptr<std::thread> monitor_thread_;
+  bool immersive_mode_enabled_ = false;
 };
 
 }  // namespace hardware_simulator

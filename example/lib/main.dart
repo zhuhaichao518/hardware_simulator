@@ -9,6 +9,7 @@ import 'package:hardware_simulator/hardware_simulator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'fps_game_example.dart';
 import 'display_manager_page.dart';
+import 'immersive_mode_example.dart';
 
 void main() {
   //SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
@@ -266,7 +267,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             textStyle: TextStyle(fontSize: 18),
           ),
         ),
-        SizedBox(height: 10),
         // 添加导航按钮到显示器管理页面
         ElevatedButton(
           onPressed: () {
@@ -276,6 +276,20 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             );
           },
           child: Text('显示器管理'),
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            textStyle: TextStyle(fontSize: 18),
+          ),
+        ),
+        if (Platform.isWindows)
+        ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ImmersiveModeExample()),
+            );
+          },
+          child: Text('沉浸模式'),
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             textStyle: TextStyle(fontSize: 18),

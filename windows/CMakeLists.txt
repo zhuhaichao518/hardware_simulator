@@ -30,6 +30,8 @@ list(APPEND PLUGIN_SOURCES
   "virtual_display.h"
   "virtual_display_control.cc"
   "virtual_display_control.h"
+  "SmartKeyboardBlocker.cpp"
+  "SmartKeyboardBlocker.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment

@@ -44,6 +44,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
           cursorImageCallbacks[callbackID]!(call.arguments['message'],
               call.arguments['msg_info'], call.arguments['cursorImage']);
         }
+      } else if (call.method == "onKeyBlocked") {
+        int keyCode = call.arguments['keyCode'];
+        bool isDown = call.arguments['isDown'];
+        for (var callback in keyBlockedCallbacks) {
+          callback(keyCode, isDown);
+        }
       }
       return null;
     });
@@ -185,6 +191,19 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   @override
   void removeKeyboardPressed(KeyboardPressedCallback callback) {
     keyBoardPressedCallbacks.remove(callback);
+  }
+  
+  final List<KeyBlockedCallback> keyBlockedCallbacks = [];
+
+  @override
+  void addKeyBlocked(KeyBlockedCallback callback) {
+    if (!isinitialized) init();
+    keyBlockedCallbacks.add(callback);
+  }
+
+  @override
+  void removeKeyBlocked(KeyBlockedCallback callback) {
+    keyBlockedCallbacks.remove(callback);
   }
 
   final List<CursorWheelCallback> cursorWheelCallbacks = [];
@@ -418,5 +437,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   @override
   Future<int> getCurrentMultiDisplayMode() async {
     return await methodChannel.invokeMethod('getCurrentMultiDisplayMode');
+  }
+
+  @override
+  Future<bool> putImmersiveModeEnabled(bool enabled) async {
+    return await methodChannel.invokeMethod('putImmersiveModeEnabled', {
+      'enabled': enabled,
+    });
   }
 }
