@@ -110,6 +110,17 @@ bool SmartKeyboardBlocker::ShouldBlockKey(DWORD vk_code) {
     case VK_RWIN:
         return true;
 
+    // TODO: Therotically we don't need to block VK_MENU
+    // However there is a bug on flutter windows that ALT
+    // is not triggered when press ALT frequently.
+    case VK_LMENU:
+        return true;
+    case VK_RMENU:
+        return true;
+
+    case VK_RCONTROL:
+        return true;
+
     case VK_TAB:
         // Check if Alt is also pressed
         if (GetAsyncKeyState(VK_MENU) & 0x8000) {

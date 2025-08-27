@@ -180,84 +180,93 @@ class _ImmersiveModeExampleState extends State<ImmersiveModeExample> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '被拦截的按键记录',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        if (_blockedKeys.isEmpty)
-                          const Text(
-                            '暂无被拦截的按键',
-                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
-                          )
-                        else
-                          ...(_blockedKeys.reversed.map((key) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2.0),
-                            child: Text(
-                              '🔒 $key',
-                              style: const TextStyle(fontFamily: 'monospace'),
-                            ),
-                          ))),
-                        if (_blockedKeys.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _blockedKeys.clear();
-                              });
-                            },
-                            child: const Text('清空记录'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '被拦截的按键记录',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              if (_blockedKeys.isEmpty)
+                                const Text(
+                                  '暂无被拦截的按键',
+                                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                                )
+                              else
+                                ...(_blockedKeys.reversed.map((key) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                  child: Text(
+                                    '🔒 $key',
+                                    style: const TextStyle(fontFamily: 'monospace'),
+                                  ),
+                                ))),
+                              if (_blockedKeys.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _blockedKeys.clear();
+                                    });
+                                  },
+                                  child: const Text('清空记录'),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '按键事件记录',
-                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        const SizedBox(height: 8),
-                        if (_pressedKeys.isEmpty)
-                          const Text(
-                            '暂无按键事件',
-                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
-                          )
-                        else
-                          ...(_pressedKeys.reversed.map((key) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2.0),
-                            child: Text(
-                              '⌨️ $key',
-                              style: const TextStyle(fontFamily: 'monospace'),
-                            ),
-                          ))),
-                        if (_pressedKeys.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _pressedKeys.clear();
-                              });
-                            },
-                            child: const Text('清空记录'),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '按键事件记录',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              if (_pressedKeys.isEmpty)
+                                const Text(
+                                  '暂无按键事件',
+                                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                                )
+                              else
+                                ...(_pressedKeys.reversed.map((key) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                  child: Text(
+                                    '⌨️ $key',
+                                    style: const TextStyle(fontFamily: 'monospace'),
+                                  ),
+                                ))),
+                              if (_pressedKeys.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _pressedKeys.clear();
+                                    });
+                                  },
+                                  child: const Text('清空记录'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Card(
