@@ -261,6 +261,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.performTouchEvent(x, y, touchId, false, 0);
   }
 
+  void _setDragWindowContents(bool enabled) {
+    HardwareSimulator.setDragWindowContents(enabled);
+  }
+
   
  
 
@@ -456,6 +460,24 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ElevatedButton(
               onPressed: _touchUp,
               child: Text('Touch Up'),
+            ),
+          ],
+        ),
+          Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                _setDragWindowContents(true);
+              },
+              child: Text('setDragWindowContents true'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: () {
+                _setDragWindowContents(false);
+              },
+              child: Text('setDragWindowContents false'),
             ),
           ],
         ),
