@@ -20,6 +20,11 @@ class HWMouse {
         .performMouseMoveAbsl(percentx, percenty, screenId);
   }
 
+  void performMouseMoveToWindowPosition(double percentx, double percenty) {
+    HardwareSimulatorPlatform.instance
+        .performMouseMoveToWindowPosition(percentx, percenty);
+  }
+
   // mouse left button id 1, right button id 3
   void performMouseClick(int buttonId, bool isDown) {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);

@@ -148,6 +148,13 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
         'performMouseMoveAbsl() has not been implemented.');
   }
 
+  // Move mouse to window position. x, y is the percentage of the current window (excluding title bar) ranged from 0 - 1.
+  Future<void> performMouseMoveToWindowPosition(
+      double percentx, double percenty) async {
+    throw UnimplementedError(
+        'performMouseMoveToWindowPosition() has not been implemented.');
+  }
+
   Future<void> performMouseClick(int buttonId, bool isDown) async {
     throw UnimplementedError('performMouseClick() has not been implemented.');
   }

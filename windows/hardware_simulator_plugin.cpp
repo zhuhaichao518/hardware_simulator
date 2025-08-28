@@ -756,6 +756,45 @@ void performMouseMoveAbsl(double x,double y,int screenId){
     send_input(i);
 }
 
+void performMouseMoveToWindowPosition(double percentx, double percenty) {
+    if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
+
+    INPUT i{};
+
+    i.type = INPUT_MOUSE;
+    auto& mi = i.mi;
+
+    // Get the current window handle (Flutter window)
+    HWND hwnd = GetForegroundWindow();
+    if (!hwnd) return;
+
+    // Get window rectangle (excluding title bar)
+    RECT windowRect;
+    if (!GetWindowRect(hwnd, &windowRect)) return;
+
+    // Get client area rectangle (excluding title bar and borders)
+    RECT clientRect;
+    if (!GetClientRect(hwnd, &clientRect)) return;
+
+    // Calculate the actual client area position on screen
+    POINT clientTopLeft = {0, 0};
+    if (!ClientToScreen(hwnd, &clientTopLeft)) return;
+
+    // Calculate target position based on percentages
+    int targetX = clientTopLeft.x + static_cast<int>(percentx * clientRect.right);
+    int targetY = clientTopLeft.y + static_cast<int>(percenty * clientRect.bottom);
+
+    // Convert to absolute screen coordinates (0-65535 range)
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+    mi.dx = (targetX * 65535) / screenWidth;
+    mi.dy = (targetY * 65535) / screenHeight;
+
+    send_input(i);
+}
+
 void scroll(int distance) {
     INPUT i{};
 
@@ -823,6 +862,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto percenty = (args->find(flutter::EncodableValue("y")))->second;
         auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
         performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))), static_cast<int>(std::get<int>((screenId))));
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("mouseMoveToWindowPosition") == 0) {
+        auto percentx = (args->find(flutter::EncodableValue("x")))->second;
+        auto percenty = (args->find(flutter::EncodableValue("y")))->second;
+        performMouseMoveToWindowPosition(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
         result->Success(nullptr);
   } else if (method_call.method_name().compare("mousePress") == 0) {
         auto buttonid = (args->find(flutter::EncodableValue("buttonId")))->second;

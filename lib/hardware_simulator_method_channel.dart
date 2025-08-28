@@ -76,7 +76,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
       _pointerLockSubscription = pointerLock
           .createSession(
-        windowsMode: PointerLockWindowsMode.capture,
+        windowsMode: PointerLockWindowsMode.clip,
         cursor: PointerLockCursor.hidden,
         unlockOnPointerUp: false, // 手动控制解锁
       )
@@ -272,6 +272,15 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'x': percentx,
       'y': percenty,
       'screenId': screenId,
+    });
+  }
+
+  @override
+  Future<void> performMouseMoveToWindowPosition(
+      double percentx, double percenty) async {
+    await methodChannel.invokeMethod('mouseMoveToWindowPosition', {
+      'x': percentx,
+      'y': percenty,
     });
   }
 

@@ -41,6 +41,8 @@ public:
      */
     static HWND GetMainWindow();
 
+    static bool IsTargetWindowActive();
+
 private:
     // Disable constructor - static methods only
     SmartKeyboardBlocker() = delete;
@@ -51,7 +53,6 @@ private:
     static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
 
     static bool ShouldBlockKey(DWORD vk_code);
-    static bool IsTargetWindowActive();
 
     // Static member variables
     static HHOOK hook_handle_;
