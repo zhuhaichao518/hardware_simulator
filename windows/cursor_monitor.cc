@@ -491,27 +491,40 @@ MousePosition GetMousePositionAndScreenId() {
 }
 
 std::vector<uint8_t> FloatToBytes(float x, float y) {
-    std::vector<uint8_t> bytes;
-    bytes.resize(sizeof(float) * 2);
-    
-    bool isLittleEndian = test_endian() == 0;
-    
+    std::vector<uint8_t> outputArray;
+    outputArray.reserve(sizeof(float) * 2);
+
+    // Add x coordinate
     uint8_t* xBytes = reinterpret_cast<uint8_t*>(&x);
-    uint8_t* yBytes = reinterpret_cast<uint8_t*>(&y);
-    
-    if (isLittleEndian) {
-        for (size_t i = 0; i < sizeof(float); ++i) {
-            bytes[i] = xBytes[i];
-            bytes[i + sizeof(float)] = yBytes[i];
-        }
-    } else {
-        for (size_t i = 0; i < sizeof(float); ++i) {
-            bytes[i] = xBytes[sizeof(float) - 1 - i];
-            bytes[i + sizeof(float)] = yBytes[sizeof(float) - 1 - i];
+    if (test_endian()) {
+        // Little endian system
+        for (size_t i = 0; i < sizeof(x); ++i) {
+            outputArray.push_back(xBytes[i]);
         }
     }
-    
-    return bytes;
+    else {
+        // Big endian system
+        for (size_t i = sizeof(x); i > 0; --i) {
+            outputArray.push_back(xBytes[i - 1]);
+        }
+    }
+
+    // Add y coordinate
+    uint8_t* yBytes = reinterpret_cast<uint8_t*>(&y);
+    if (test_endian()) {
+        // Little endian system
+        for (size_t i = 0; i < sizeof(y); ++i) {
+            outputArray.push_back(yBytes[i]);
+        }
+    }
+    else {
+        // Big endian system
+        for (size_t i = sizeof(y); i > 0; --i) {
+            outputArray.push_back(yBytes[i - 1]);
+        }
+    }
+
+    return outputArray;
 }
 
 bool IsCursorVisible() {
