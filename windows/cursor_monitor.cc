@@ -584,7 +584,7 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
     hookAllCursorImage[callback_id] = hookAll;
     cachedcursors[callback_id] = {};
 
-    if (IsCursorVisible()) {
+    if (!IsCursorVisible()) {
         MousePosition mousePos = GetMousePositionAndScreenId();
         std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
         callback(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
