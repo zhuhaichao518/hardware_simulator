@@ -277,7 +277,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               MaterialPageRoute(builder: (context) => FPSGameExample()),
             );
           },
-          child: Text('进入FPS游戏示例'),
+          child: Text('进入FPS游戏示例(windows需先进入沉浸模式)'),
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             textStyle: TextStyle(fontSize: 18),

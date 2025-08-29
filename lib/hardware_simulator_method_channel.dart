@@ -15,7 +15,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   final methodChannel = const MethodChannel('hardware_simulator');
   bool isinitialized = false;
 
-  // pointer lock on windows and linux.
+  // pointer lock on linux.
   StreamSubscription<PointerLockMoveEvent>? _pointerLockSubscription;
 
   void init() {
@@ -69,9 +69,8 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> lockCursor() async {
-    // use pointer_lock on windows and linux.
-    if (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux) {
+    // use pointer_lock on linux, native implementation on windows and other platforms.
+    if (defaultTargetPlatform == TargetPlatform.linux) {
       await _pointerLockSubscription?.cancel();
 
       _pointerLockSubscription = pointerLock
@@ -100,8 +99,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> unlockCursor() async {
-    if (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux) {
+    if (defaultTargetPlatform == TargetPlatform.linux) {
       await _pointerLockSubscription?.cancel();
       _pointerLockSubscription = null;
     } else {
