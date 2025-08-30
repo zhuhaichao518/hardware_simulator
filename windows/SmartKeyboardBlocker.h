@@ -41,6 +41,7 @@ public:
      */
     static HWND GetMainWindow();
 
+    static HWND target_window_;
     static bool IsTargetWindowActive();
 
 private:
@@ -56,7 +57,6 @@ private:
 
     // Static member variables
     static HHOOK hook_handle_;
-    static HWND target_window_;
     static BlockedKeyCallback callback_;
     static std::unordered_map<DWORD, bool> key_states_; // Track key states to avoid repeat callbacks
 };

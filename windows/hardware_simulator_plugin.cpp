@@ -770,7 +770,7 @@ void performMouseMoveAbsl(double x,double y,int screenId){
 }
 
 void performMouseMoveToWindowPosition(double percentx, double percenty) {
-    if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
+    //if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
 
     INPUT i{};
 
@@ -778,7 +778,7 @@ void performMouseMoveToWindowPosition(double percentx, double percenty) {
     auto& mi = i.mi;
 
     // Get the current window handle (Flutter window)
-    HWND hwnd = GetForegroundWindow();
+    HWND hwnd = SmartKeyboardBlocker::target_window_;//GetForegroundWindow();
     if (!hwnd) return;
 
     // Get window rectangle (excluding title bar)
@@ -1261,7 +1261,7 @@ void HardwareSimulatorPlugin::LockCursor() {
         return; // Already locked
     }
 
-    if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
+    //if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
     
     // Find Flutter window
     main_window_ = FindFlutterWindow();
