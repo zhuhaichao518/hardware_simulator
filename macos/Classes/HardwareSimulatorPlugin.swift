@@ -310,6 +310,53 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
       }
   }
 
+  func performMouseMoveToWindowPosition(percentx: Double, percenty: Double) {
+      // Get the current Flutter app's main window
+      guard let mainWindow = NSApplication.shared.mainWindow ?? NSApplication.shared.windows.first else {
+          print("Failed to get Flutter main window")
+          return
+      }
+      
+      // Get the window's content area (excluding title bar and decorations)
+      let contentRect = mainWindow.contentView?.bounds ?? mainWindow.frame
+      let windowFrame = mainWindow.frame
+      
+      // Calculate the content area position on screen
+      // Convert from window coordinates to screen coordinates
+      let contentOriginInWindow = mainWindow.contentView?.frame.origin ?? CGPoint.zero
+      let contentOriginInScreen = CGPoint(
+          x: windowFrame.origin.x + contentOriginInWindow.x,
+          y: windowFrame.origin.y + contentOriginInWindow.y
+      )
+      
+      // Calculate target position based on percentages within the content area
+      let targetX = contentOriginInScreen.x + (percentx * contentRect.width)
+      
+      // For Y coordinate: NSWindow uses bottom-left origin, but percentages should work top-to-bottom
+      // So percenty=0 should be top of content area, percenty=1 should be bottom
+      // We need to convert from window coordinates (bottom-left origin) to screen coordinates (top-left origin)
+      let screenHeight = NSScreen.main?.frame.height ?? 0
+      let windowBottomInScreen = screenHeight - windowFrame.origin.y
+      let contentTopInScreen = windowBottomInScreen - contentRect.height
+      let targetY = contentTopInScreen + (percenty * contentRect.height)
+      
+      // Get current mouse button state to maintain drag behavior
+      var eventType: CGEventType = .mouseMoved
+      let pressedButtons = NSEvent.pressedMouseButtons
+      if pressedButtons & (1 << 0) != 0 {
+          eventType = .leftMouseDragged
+      } else if pressedButtons & (1 << 1) != 0 {
+          eventType = .rightMouseDragged
+      }
+      
+      // Create and post the mouse move event
+      let moveEvent = CGEvent(mouseEventSource: nil, 
+                             mouseType: eventType, 
+                             mouseCursorPosition: CGPoint(x: targetX, y: targetY), 
+                             mouseButton: .left)
+      moveEvent?.post(tap: .cghidEventTap)
+  }
+
   var monitor: Any?
     
   // 监听鼠标移动并解耦鼠标和光标
@@ -552,6 +599,16 @@ public class HardwareSimulatorPlugin: NSObject, FlutterPlugin {
         result(nil) // 表示成功执行，不返回值
       } else {
         result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for Mouse Scroll", details: nil))
+      }
+    case "mouseMoveToWindowPosition":
+      if let args = call.arguments as? [String: Any],
+        let percentX = args["x"] as? Double,
+        let percentY = args["y"] as? Double {
+        // 调用鼠标移动到窗口位置函数
+        performMouseMoveToWindowPosition(percentx: percentX, percenty: percentY)
+        result(nil) // 表示成功执行，不返回值
+      } else {
+        result(FlutterError(code: "BAD_ARGS", message: "Missing or incorrect arguments for mouseMoveToWindowPosition", details: nil))
       }
     case "KeyPress":
         if let args = call.arguments as? [String: Any],

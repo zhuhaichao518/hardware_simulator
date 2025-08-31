@@ -63,6 +63,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     double x = double.tryParse(xController.text) ?? 0;
     double y = double.tryParse(yController.text) ?? 0;
     hardwareSimulator.getMouse().performMouseMoveAbsl(x, y, 0);
+    //hardwareSimulator.getMouse().performMouseMoveToWindowPosition(x, y);
   }
 
   void _moveMouseRelative() {
