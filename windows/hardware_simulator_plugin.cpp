@@ -873,6 +873,25 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
         CursorMonitor::endHook(callbackID);
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("hookCursorPosition") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::startPositionHook([this, callbackID](int message, int screenId, double xPercent, double yPercent) {
+            flutter::EncodableMap encoded_message;
+            encoded_message[flutter::EncodableValue("callbackID")] = flutter::EncodableValue(callbackID);
+            encoded_message[flutter::EncodableValue("message")] = flutter::EncodableValue(message);
+            encoded_message[flutter::EncodableValue("screenId")] = flutter::EncodableValue(screenId);
+            encoded_message[flutter::EncodableValue("xPercent")] = flutter::EncodableValue(xPercent);
+            encoded_message[flutter::EncodableValue("yPercent")] = flutter::EncodableValue(yPercent);
+            if (channel_) {
+                channel_->InvokeMethod("onCursorPositionMessage", 
+                    std::make_unique<flutter::EncodableValue>(encoded_message));
+            }
+        }, callbackID);
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("unhookCursorPosition") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::endPositionHook(callbackID);
+        result->Success(nullptr);
   } else if (method_call.method_name().compare("createGameController") == 0) {
         int hr = GameControllerManager::CreateGameController();
         result->Success(flutter::EncodableValue(hr));

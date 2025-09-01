@@ -13,6 +13,8 @@ typedef KeyBlockedCallback = void Function(int keyCode, bool isDown);
 typedef CursorWheelCallback = void Function(double deltaX, double deltaY);
 typedef CursorImageUpdatedCallback = void Function(
     int message, int messageInfo, Uint8List cursorImage);
+typedef CursorPositionUpdatedCallback = void Function(
+    int message, int screenId, double xPercent, double yPercent);
 
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
@@ -128,6 +130,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   void removeCursorImageUpdated(int callbackId) {
     throw UnimplementedError(
         'removeCursorImageUpdated() has not been implemented.');
+  }
+
+  void addCursorPositionUpdated(
+      CursorPositionUpdatedCallback callback, int callbackId) {
+    throw UnimplementedError(
+        'addCursorPositionUpdated() has not been implemented.');
+  }
+
+  void removeCursorPositionUpdated(int callbackId) {
+    throw UnimplementedError(
+        'removeCursorPositionUpdated() has not been implemented.');
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {

@@ -44,6 +44,16 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
           cursorImageCallbacks[callbackID]!(call.arguments['message'],
               call.arguments['msg_info'], call.arguments['cursorImage']);
         }
+      } else if (call.method == "onCursorPositionMessage") {
+        int callbackID = call.arguments['callbackID'];
+        if (cursorPositionCallbacks.containsKey(callbackID)) {
+          // Directly get double values from arguments
+          double xPercent = call.arguments['xPercent'];
+          double yPercent = call.arguments['yPercent'];
+          
+          cursorPositionCallbacks[callbackID]!(call.arguments['message'],
+              call.arguments['screenId'], xPercent, yPercent);
+        }
       } else if (call.method == "onKeyBlocked") {
         int keyCode = call.arguments['keyCode'];
         bool isDown = call.arguments['isDown'];
@@ -218,6 +228,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   final Map<int, CursorImageUpdatedCallback> cursorImageCallbacks = {};
+  final Map<int, CursorPositionUpdatedCallback> cursorPositionCallbacks = {};
 
   @override
   void addCursorImageUpdated(
@@ -239,6 +250,29 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       cursorImageCallbacks.remove(callbackId);
     }
     methodChannel.invokeMethod('unhookCursorImage', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void addCursorPositionUpdated(
+      CursorPositionUpdatedCallback callback, int callbackId) {
+    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
+    if (!isinitialized) init();
+    cursorPositionCallbacks[callbackId] = callback;
+    methodChannel.invokeMethod('hookCursorPosition', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void removeCursorPositionUpdated(int callbackId) {
+    if (cursorPositionCallbacks.containsKey(callbackId)) {
+      cursorPositionCallbacks.remove(callbackId);
+    }
+    methodChannel.invokeMethod('unhookCursorPosition', {
       'callbackID': callbackId,
     });
   }

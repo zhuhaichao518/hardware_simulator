@@ -16,6 +16,11 @@ static std::map<long long, std::unordered_set<uint32_t>> cachedcursors;
 static std::map<long long, CursorChangedCallback> callbacks;
 static std::map<long long, bool> hookAllCursorImage;
 
+// Position monitoring callbacks and state
+static std::map<long long, CursorPositionCallback> positionCallbacks;
+static HHOOK positionHook = nullptr;
+static POINT lastCursorPos = {0, 0};
+
 bool HasAlphaChannel(const uint32_t* data, int stride, int width, int height) {
     const RGBQUAD* plane = reinterpret_cast<const RGBQUAD*>(data);
     for (int y = 0; y < height; ++y) {
@@ -483,6 +488,29 @@ MousePosition GetMousePositionAndScreenId() {
     return {screenId, xPercent, yPercent};
 }
 
+// Low-level mouse hook procedure for position monitoring
+LRESULT CALLBACK MousePositionHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode >= 0 && wParam == WM_MOUSEMOVE) {
+        POINT currentPos;
+        GetCursorPos(&currentPos);
+        
+        // Check if position has changed
+        if (currentPos.x != lastCursorPos.x || currentPos.y != lastCursorPos.y) {
+            lastCursorPos = currentPos;
+            
+            // Get mouse position and screen info
+            MousePosition mousePos = GetMousePositionAndScreenId();
+            
+            // Notify all position callbacks with direct double values
+            for (auto& callback : positionCallbacks) {
+                callback.second(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+            }
+        }
+    }
+    
+    return CallNextHookEx(positionHook, nCode, wParam, lParam);
+}
+
 std::vector<uint8_t> FloatToBytes(float x, float y) {
     std::vector<uint8_t> outputArray;
     outputArray.reserve(sizeof(float) * 2);
@@ -606,5 +634,29 @@ void CursorMonitor::endHook(long long callback_id) {
     cachedcursors.erase(cachedcursors.find(callback_id));
     if (callbacks.empty()) {
         UnhookWinEvent(Global_HOOK);
+    }
+}
+
+void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long callback_id) {
+    positionCallbacks[callback_id] = callback;
+    
+    // Install low-level mouse hook if this is the first position callback
+    if (positionCallbacks.size() == 1 && positionHook == nullptr) {
+        positionHook = SetWindowsHookEx(WH_MOUSE_LL, MousePositionHookProc, GetModuleHandle(nullptr), 0);
+        GetCursorPos(&lastCursorPos);
+    }
+    
+    // Send initial position
+    MousePosition mousePos = GetMousePositionAndScreenId();
+    callback(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+}
+
+void CursorMonitor::endPositionHook(long long callback_id) {
+    positionCallbacks.erase(positionCallbacks.find(callback_id));
+    
+    // Remove hook if no more position callbacks
+    if (positionCallbacks.empty() && positionHook != nullptr) {
+        UnhookWindowsHookEx(positionHook);
+        positionHook = nullptr;
     }
 }
