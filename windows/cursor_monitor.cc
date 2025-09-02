@@ -1,4 +1,5 @@
 #include "cursor_monitor.h"
+#include "hardware_simulator_plugin.h"
 
 #include <windows.h>
 #include <string>
@@ -453,19 +454,11 @@ MousePosition GetMousePositionAndScreenId() {
     monitorInfo.cbSize = sizeof(MONITORINFOEX);
     GetMonitorInfo(hMonitor, &monitorInfo);
 
-    static std::vector<RECT> monitors;
-    static bool monitorsInitialized = false;
-
-    if (!monitorsInitialized) {
-        monitors.clear();
-        EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
-            auto& list = *reinterpret_cast<std::vector<RECT>*>(data);
-            MONITORINFO info{ sizeof(MONITORINFO) };
-            GetMonitorInfo(hMon, &info);
-            list.push_back(info.rcMonitor);
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&monitors));
-        monitorsInitialized = true;
+    // Use HardwareSimulatorPlugin's static monitors
+    const auto& monitors_info = hardware_simulator::HardwareSimulatorPlugin::GetStaticMonitors();
+    std::vector<RECT> monitors;
+    for (const auto& info : monitors_info) {
+        monitors.push_back(info.rect);
     }
 
     int screenId = 0;

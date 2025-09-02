@@ -165,16 +165,11 @@ HDESK syncThreadDesktop() {
     return hDesk;
 }
 
-struct MonitorInfo {
-    RECT rect;
-    bool is_primary;
-};
-
-std::vector<MonitorInfo> g_monitors;
 std::optional<int> HardwareSimulatorPlugin::dpi_monitor_proc_id_ = NULL;
+std::vector<MonitorInfo> HardwareSimulatorPlugin::static_monitors_;
 
-void update_monitors() {
-    g_monitors.clear();
+void HardwareSimulatorPlugin::UpdateStaticMonitors() {
+    static_monitors_.clear();
     //EnumDisplayDevicesW in WebRTC
     EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
         auto& list = *reinterpret_cast<std::vector<MonitorInfo>*>(data);
@@ -182,11 +177,15 @@ void update_monitors() {
         GetMonitorInfo(hMon, &info);
         list.push_back({ info.rcMonitor, (info.dwFlags & MONITORINFOF_PRIMARY) != 0 });
         return TRUE;
-        }, reinterpret_cast<LPARAM>(&g_monitors));
+        }, reinterpret_cast<LPARAM>(&static_monitors_));
+}
+
+const std::vector<MonitorInfo>& HardwareSimulatorPlugin::GetStaticMonitors() {
+    return static_monitors_;
 }
 
 std::vector<MonitorInfo> get_monitors() {
-    return g_monitors;
+    return HardwareSimulatorPlugin::GetStaticMonitors();
 }
 
 bool adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
@@ -543,11 +542,11 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
   registrar->AddPlugin(std::move(plugin));
 
   // start to monitor display resolution and DPI.
-  update_monitors();
+  HardwareSimulatorPlugin::UpdateStaticMonitors();
   dpi_monitor_proc_id_ = registrar->RegisterTopLevelWindowProcDelegate(
       [](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
           if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
-              update_monitors();
+              HardwareSimulatorPlugin::UpdateStaticMonitors();
           }
           return std::nullopt;
       });
@@ -1350,7 +1349,7 @@ bool HardwareSimulatorPlugin::SubscribeToRawInputData() {
             }
 
             if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
-                update_monitors();
+                HardwareSimulatorPlugin::UpdateStaticMonitors();
             }
 
             return std::nullopt;

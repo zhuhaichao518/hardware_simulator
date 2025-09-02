@@ -8,7 +8,13 @@
 #include <memory>
 #include <thread>
 #include <windows.h>
+#include <vector>
 #include "SmartKeyboardBlocker.h"
+
+struct MonitorInfo {
+    RECT rect;
+    bool is_primary;
+};
 
 namespace hardware_simulator {
 
@@ -41,6 +47,10 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
   void LockCursor();
   void UnlockCursor();
   bool IsCursorLocked() const { return cursor_locked_; }
+  
+  // Static monitor management
+  static void UpdateStaticMonitors();
+  static const std::vector<MonitorInfo>& GetStaticMonitors();
 
  private:
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
@@ -58,6 +68,9 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
   bool raw_input_registered_ = false;
   std::optional<int> raw_input_proc_id_;
   static std::optional<int> dpi_monitor_proc_id_;
+  
+  // Static monitor management
+  static std::vector<MonitorInfo> static_monitors_;
   
   // Helper methods for cursor lock
   void CleanupCursorLock();
