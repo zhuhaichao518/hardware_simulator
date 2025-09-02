@@ -57,6 +57,7 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
   // Raw Input related members
   bool raw_input_registered_ = false;
   std::optional<int> raw_input_proc_id_;
+  static std::optional<int> dpi_monitor_proc_id_;
   
   // Helper methods for cursor lock
   void CleanupCursorLock();

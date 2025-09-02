@@ -171,6 +171,7 @@ struct MonitorInfo {
 };
 
 std::vector<MonitorInfo> g_monitors;
+std::optional<int> HardwareSimulatorPlugin::dpi_monitor_proc_id_ = NULL;
 
 void update_monitors() {
     g_monitors.clear();
@@ -186,63 +187,6 @@ void update_monitors() {
 
 std::vector<MonitorInfo> get_monitors() {
     return g_monitors;
-}
-
-LRESULT CALLBACK DpiMonitorWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-        case WM_DPICHANGED:
-            update_monitors();
-            break;
-        case WM_DISPLAYCHANGE:
-            update_monitors();
-            break; 
-    }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-/*
-HWND CreateHiddenMessageWindow() {
-    WNDCLASS wc{};
-    wc.lpfnWndProc = DpiMonitorWndProc;
-    wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"DpiMonitorWindow";
-    RegisterClass(&wc);
-
-    return CreateWindowEx(0, wc.lpszClassName, nullptr, 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
-}*/
-
-HWND CreateHiddenMessageWindow() {
-    WNDCLASS wc{};
-    wc.lpfnWndProc = DpiMonitorWndProc;
-    wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"DpiMonitorWindow";
-
-    if (!RegisterClass(&wc)) {
-        //DWORD err = GetLastError();
-        //OutputDebugString(L"RegisterClass failed!");
-        return nullptr;
-    }
-
-    HWND hWnd = CreateWindowEx(
-        0,
-        wc.lpszClassName,
-        L"Hidden DPI Monitor",
-        WS_OVERLAPPEDWINDOW,
-        0, 0, 100, 100,
-        nullptr,
-        nullptr,
-        wc.hInstance,
-        nullptr
-    );
-
-    if (!hWnd) {
-        //DWORD err = GetLastError();
-        //OutputDebugString(L"CreateWindowEx failed!");
-        return nullptr;
-    }
-
-    ShowWindow(hWnd, SW_HIDE);
-    return hWnd;
 }
 
 bool adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
@@ -575,7 +519,6 @@ bool RunBatchAsAdmin(
 // static
 void HardwareSimulatorPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
-  CreateHiddenMessageWindow();
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "hardware_simulator",
@@ -598,6 +541,16 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
   }
 
   registrar->AddPlugin(std::move(plugin));
+
+  // start to monitor display resolution and DPI.
+  update_monitors();
+  dpi_monitor_proc_id_ = registrar->RegisterTopLevelWindowProcDelegate(
+      [](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
+          if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
+              update_monitors();
+          }
+          return std::nullopt;
+      });
 }
 
 HardwareSimulatorPlugin::HardwareSimulatorPlugin() {
@@ -614,6 +567,10 @@ HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
     StopMonitorThread();
     destroyTouchDevice();
     CleanupCursorLock();
+    if (dpi_monitor_proc_id_.has_value()) {
+        registrar_->UnregisterTopLevelWindowProcDelegate(dpi_monitor_proc_id_.value());
+        dpi_monitor_proc_id_.reset();
+    }
 }
 
 void async_send_input_retry(INPUT& i) {
@@ -858,7 +815,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(version_stream.str()));
   } else if (method_call.method_name().compare("getMonitorCount") == 0) {
     int monitorCount = GetSystemMetrics(SM_CMONITORS);
-    update_monitors();
+    //update_monitors();
     result->Success(flutter::EncodableValue(monitorCount));
   } else if (method_call.method_name().compare("KeyPress") == 0) {
         auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
@@ -1391,6 +1348,11 @@ bool HardwareSimulatorPlugin::SubscribeToRawInputData() {
                 //DefRawInputProc((PRAWINPUT*)&lparam, 1, sizeof(RAWINPUTHEADER));
                 //return 0;
             }
+
+            if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
+                update_monitors();
+            }
+
             return std::nullopt;
         });
     
