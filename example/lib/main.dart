@@ -187,6 +187,30 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.removeCursorImageUpdated(1);
   }
 
+  // 鼠标位置监控相关变量
+  bool _positionMonitoringActive = false;
+
+  void _startPositionMonitoring() async {
+    if (_positionMonitoringActive) return;
+    
+    _positionMonitoringActive = true;
+    HardwareSimulator.addCursorPositionUpdated((message, screenId, xPercent, yPercent) {
+      if (message == HardwareSimulator.CURSOR_POSITION_CHANGED) {
+        print('鼠标位置变化 - 屏幕ID: $screenId, X: ${(xPercent * 100).toStringAsFixed(1)}%, Y: ${(yPercent * 100).toStringAsFixed(1)}%');
+      }
+    }, 2); // 使用回调ID 2
+    
+    print('鼠标位置监控已启动');
+  }
+
+  void _stopPositionMonitoring() async {
+    if (!_positionMonitoringActive) return;
+    
+    HardwareSimulator.removeCursorPositionUpdated(2);
+    _positionMonitoringActive = false;
+    print('鼠标位置监控已停止');
+  }
+
   FocusNode? _textFieldFocusNode;
 
   @override
@@ -204,6 +228,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _textFieldFocusNode?.dispose();
     _unregisterCursorChanged();
     _unregisterTrackCursor(); // 注销trackCursor回调
+    _stopPositionMonitoring(); // 停止鼠标位置监控
     super.dispose();
   }
 
@@ -397,6 +422,22 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 child: Text('unregister CursorImageChanged')),
           ],
         ),
+        // 鼠标位置监控按钮
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _positionMonitoringActive ? null : _startPositionMonitoring,
+              child: Text('开始监控鼠标位置'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _positionMonitoringActive ? _stopPositionMonitoring : null,
+              child: Text('停止监控鼠标位置'),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
