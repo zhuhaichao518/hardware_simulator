@@ -640,9 +640,10 @@ void CursorMonitor::endHook(long long callback_id) {
 void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long callback_id) {
     positionCallbacks[callback_id] = callback;
     
-    // Install low-level mouse hook if this is the first position callback
-    if (positionCallbacks.size() == 1 && positionHook == nullptr) {
-        positionHook = SetWindowsHookEx(WH_MOUSE_LL, MousePositionHookProc, GetModuleHandle(nullptr), 0);
+    // Start hook thread if this is the first position callback
+    // We have to do this: https://www.soinside.com/question/hP9qqHrPWatdNm68nNtFfd
+    if (positionCallbacks.size() == 1) {
+        startHookThread();
         GetCursorPos(&lastCursorPos);
     }
     
@@ -654,9 +655,73 @@ void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long
 void CursorMonitor::endPositionHook(long long callback_id) {
     positionCallbacks.erase(positionCallbacks.find(callback_id));
     
-    // Remove hook if no more position callbacks
-    if (positionCallbacks.empty() && positionHook != nullptr) {
+    // Stop hook thread if no more position callbacks
+    if (positionCallbacks.empty()) {
+        stopHookThread();
+    }
+}
+
+// Static member definitions for thread management
+std::unique_ptr<std::thread> CursorMonitor::hookThread = nullptr;
+std::atomic<bool> CursorMonitor::shouldStopHookThread{false};
+std::atomic<bool> CursorMonitor::hookThreadRunning{false};
+
+void CursorMonitor::startHookThread() {
+    if (hookThreadRunning.load()) {
+        return; // Thread already running
+    }
+    
+    shouldStopHookThread.store(false);
+    hookThread = std::make_unique<std::thread>(hookThreadFunction);
+}
+
+void CursorMonitor::stopHookThread() {
+    if (!hookThreadRunning.load()) {
+        return; // Thread not running
+    }
+    
+    shouldStopHookThread.store(true);
+    
+    if (hookThread && hookThread->joinable()) {
+        hookThread->join();
+    }
+    
+    hookThread.reset();
+    hookThreadRunning.store(false);
+}
+
+void CursorMonitor::hookThreadFunction() {
+    hookThreadRunning.store(true);
+    
+    // Install the hook in this thread
+    positionHook = SetWindowsHookEx(WH_MOUSE_LL, MousePositionHookProc, GetModuleHandle(nullptr), 0);
+    
+    if (positionHook == nullptr) {
+        hookThreadRunning.store(false);
+        return;
+    }
+    
+    // Message loop for the hook thread
+    MSG msg;
+    while (!shouldStopHookThread.load()) {
+        // Get message with timeout to allow checking shouldStopHookThread
+        BOOL result = GetMessage(&msg, nullptr, 0, 0);
+        
+        if (result == 0 || result == -1) {
+            // WM_QUIT or error
+            break;
+        }
+        
+        // Process the message
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    
+    // Clean up hook
+    if (positionHook != nullptr) {
         UnhookWindowsHookEx(positionHook);
         positionHook = nullptr;
     }
+    
+    hookThreadRunning.store(false);
 }

@@ -5,6 +5,8 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <thread>
+#include <atomic>
 using CursorChangedCallback = std::function<void(int, int, const std::vector<uint8_t>&)>;
 using CursorPositionCallback = std::function<void(int, int, double, double)>;
 
@@ -25,4 +27,15 @@ public:
     // Position monitoring functions
     static void startPositionHook(CursorPositionCallback callback, long long callback_id);
     static void endPositionHook(long long callback_id);
+    
+private:
+    // Hook thread management
+    static void hookThreadFunction();
+    static void startHookThread();
+    static void stopHookThread();
+    
+    // Thread-related static variables
+    static std::unique_ptr<std::thread> hookThread;
+    static std::atomic<bool> shouldStopHookThread;
+    static std::atomic<bool> hookThreadRunning;
 };
