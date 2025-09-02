@@ -170,7 +170,9 @@ std::vector<MonitorInfo> HardwareSimulatorPlugin::static_monitors_;
 
 void HardwareSimulatorPlugin::UpdateStaticMonitors() {
     static_monitors_.clear();
-    //EnumDisplayDevicesW in WebRTC
+    
+    // Original implementation using EnumDisplayMonitors (commented out)
+    /*
     EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
         auto& list = *reinterpret_cast<std::vector<MonitorInfo>*>(data);
         MONITORINFO info{ sizeof(MONITORINFO) };
@@ -178,6 +180,29 @@ void HardwareSimulatorPlugin::UpdateStaticMonitors() {
         list.push_back({ info.rcMonitor, (info.dwFlags & MONITORINFOF_PRIMARY) != 0 });
         return TRUE;
         }, reinterpret_cast<LPARAM>(&static_monitors_));
+    */
+    
+    // New implementation using EnumDisplayDevices
+    DISPLAY_DEVICE displayDevice;
+    displayDevice.cb = sizeof(DISPLAY_DEVICE);
+    
+    for (DWORD deviceNum = 0; EnumDisplayDevices(NULL, deviceNum, &displayDevice, 0); deviceNum++) {
+        if (displayDevice.StateFlags & DISPLAY_DEVICE_ACTIVE) {
+            DEVMODE devMode;
+            devMode.dmSize = sizeof(DEVMODE);
+            
+            if (EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+                MonitorInfo info;
+                info.rect.left = devMode.dmPosition.x;
+                info.rect.top = devMode.dmPosition.y;
+                info.rect.right = devMode.dmPosition.x + devMode.dmPelsWidth;
+                info.rect.bottom = devMode.dmPosition.y + devMode.dmPelsHeight;
+                info.is_primary = (displayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) != 0;
+                
+                static_monitors_.push_back(info);
+            }
+        }
+    }
 }
 
 const std::vector<MonitorInfo>& HardwareSimulatorPlugin::GetStaticMonitors() {
