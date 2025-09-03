@@ -681,7 +681,13 @@ void CursorMonitor::stopHookThread() {
     }
     
     shouldStopHookThread.store(true);
-    
+
+    // Post a quit message to wake up the message loop
+    DWORD threadId = GetThreadId(hookThread->native_handle());
+    if (threadId != 0) {
+        PostThreadMessage(threadId, WM_QUIT, 0, 0);
+    }
+
     if (hookThread && hookThread->joinable()) {
         hookThread->join();
     }
@@ -704,19 +710,21 @@ void CursorMonitor::hookThreadFunction() {
     // Message loop for the hook thread
     MSG msg;
     while (!shouldStopHookThread.load()) {
-        // Get message with timeout to allow checking shouldStopHookThread
+        // Use GetMessage - PostThreadMessage will wake it up when stopping
         BOOL result = GetMessage(&msg, nullptr, 0, 0);
         
-        if (result == 0 || result == -1) {
-            // WM_QUIT or error
+        if (result == 0) {
+            // WM_QUIT received
+            break;
+        } else if (result == -1) {
+            // Error occurred
             break;
         }
         
-        // Process the message
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    
+
     // Clean up hook
     if (positionHook != nullptr) {
         UnhookWindowsHookEx(positionHook);
