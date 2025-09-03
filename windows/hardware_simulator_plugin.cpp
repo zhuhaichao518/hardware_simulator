@@ -68,7 +68,7 @@ struct TouchState {
 
 static bool g_auto_repeat_enabled = true;
 static std::atomic<bool> g_thread_running{false};
-static std::mutex g_event_mutex;
+static std::recursive_mutex g_event_mutex;
 static std::unordered_map<uint16_t, KeyState> g_key_states;
 static uint16_t g_last_known_key_down = 0;
 static std::unordered_map<uint32_t, TouchState> g_touch_states;
@@ -79,7 +79,7 @@ static void EventMonitorThread() {
             auto now = std::chrono::steady_clock::now();
             
             {
-                std::lock_guard<std::mutex> lock(g_event_mutex);
+                std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
                 
                 // Check key states
                 if (g_key_states.find(g_last_known_key_down) != g_key_states.end()) {
@@ -138,7 +138,7 @@ void SetAutoRepeatEnabled(bool enabled) {
     // The auto-repeat state will be handled when the thread is next started/stopped.
     if (!enabled) {
         // Clear any existing states
-        std::lock_guard<std::mutex> lock(g_event_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
         g_key_states.clear();
         g_touch_states.clear();
     }
@@ -389,7 +389,7 @@ void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool 
 
     // Add state tracking
     if (g_auto_repeat_enabled && !isRepeat) {
-        std::lock_guard<std::mutex> lock(g_event_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
         if (isDown) {
             g_touch_states[touchId] = {true, x, y, screenId, std::chrono::steady_clock::now()};
         } else if (g_touch_states.find(touchId) != g_touch_states.end()) {
@@ -430,7 +430,7 @@ void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
     touchInfo.rcContact.bottom = touchInfo.pointerInfo.ptPixelLocation.y + 10;
 
     if (g_auto_repeat_enabled) {
-        std::lock_guard<std::mutex> lock(g_event_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
         if (g_touch_states.find(touchId) != g_touch_states.end()) {
             //update the position
             g_touch_states[touchId] = { true, x, y, screenId, std::chrono::steady_clock::now() };
@@ -728,7 +728,7 @@ void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat = false) {
 
     // Add state tracking
     if (g_auto_repeat_enabled && !isRepeat) {
-        std::lock_guard<std::mutex> lock(g_event_mutex);
+        std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
         if (isDown) {
             g_key_states[modcode] = {true, std::chrono::steady_clock::now()};
             g_last_known_key_down = modcode;
@@ -739,7 +739,7 @@ void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat = false) {
 }
 
 void clearAllPressedEvents() {
-    std::lock_guard<std::mutex> lock(g_event_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_event_mutex);
     
     // Clear all pressed keyboard keys
     for (auto& [keyCode, state] : g_key_states) {
