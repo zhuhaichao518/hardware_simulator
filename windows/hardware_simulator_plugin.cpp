@@ -12,6 +12,9 @@
 // For getPlatformVersion; remove unless needed for your plugin implementation.
 #include <VersionHelpers.h>
 
+// For HID usage constants
+#include <hidusage.h>
+
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
@@ -162,84 +165,52 @@ HDESK syncThreadDesktop() {
     return hDesk;
 }
 
-struct MonitorInfo {
-    RECT rect;
-    bool is_primary;
-};
+std::optional<int> HardwareSimulatorPlugin::dpi_monitor_proc_id_ = NULL;
+std::vector<MonitorInfo> HardwareSimulatorPlugin::static_monitors_;
 
-std::vector<MonitorInfo> g_monitors;
-
-void update_monitors() {
-    g_monitors.clear();
-    //EnumDisplayDevicesW in WebRTC
+void HardwareSimulatorPlugin::UpdateStaticMonitors() {
+    static_monitors_.clear();
+    
+    // Original implementation using EnumDisplayMonitors (commented out)
+    /*
     EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
         auto& list = *reinterpret_cast<std::vector<MonitorInfo>*>(data);
         MONITORINFO info{ sizeof(MONITORINFO) };
         GetMonitorInfo(hMon, &info);
         list.push_back({ info.rcMonitor, (info.dwFlags & MONITORINFOF_PRIMARY) != 0 });
         return TRUE;
-        }, reinterpret_cast<LPARAM>(&g_monitors));
+        }, reinterpret_cast<LPARAM>(&static_monitors_));
+    */
+    
+    // New implementation using EnumDisplayDevices
+    DISPLAY_DEVICE displayDevice;
+    displayDevice.cb = sizeof(DISPLAY_DEVICE);
+    
+    for (DWORD deviceNum = 0; EnumDisplayDevices(NULL, deviceNum, &displayDevice, 0); deviceNum++) {
+        if (displayDevice.StateFlags & DISPLAY_DEVICE_ACTIVE) {
+            DEVMODE devMode;
+            devMode.dmSize = sizeof(DEVMODE);
+            
+            if (EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+                MonitorInfo info;
+                info.rect.left = devMode.dmPosition.x;
+                info.rect.top = devMode.dmPosition.y;
+                info.rect.right = devMode.dmPosition.x + devMode.dmPelsWidth;
+                info.rect.bottom = devMode.dmPosition.y + devMode.dmPelsHeight;
+                info.is_primary = (displayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) != 0;
+                
+                static_monitors_.push_back(info);
+            }
+        }
+    }
+}
+
+const std::vector<MonitorInfo>& HardwareSimulatorPlugin::GetStaticMonitors() {
+    return static_monitors_;
 }
 
 std::vector<MonitorInfo> get_monitors() {
-    return g_monitors;
-}
-
-LRESULT CALLBACK DpiMonitorWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-        case WM_DPICHANGED:
-            update_monitors();
-            break;
-        case WM_DISPLAYCHANGE:
-            update_monitors();
-            break; 
-    }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-/*
-HWND CreateHiddenMessageWindow() {
-    WNDCLASS wc{};
-    wc.lpfnWndProc = DpiMonitorWndProc;
-    wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"DpiMonitorWindow";
-    RegisterClass(&wc);
-
-    return CreateWindowEx(0, wc.lpszClassName, nullptr, 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
-}*/
-
-HWND CreateHiddenMessageWindow() {
-    WNDCLASS wc{};
-    wc.lpfnWndProc = DpiMonitorWndProc;
-    wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"DpiMonitorWindow";
-
-    if (!RegisterClass(&wc)) {
-        //DWORD err = GetLastError();
-        //OutputDebugString(L"RegisterClass failed!");
-        return nullptr;
-    }
-
-    HWND hWnd = CreateWindowEx(
-        0,
-        wc.lpszClassName,
-        L"Hidden DPI Monitor",
-        WS_OVERLAPPEDWINDOW,
-        0, 0, 100, 100,
-        nullptr,
-        nullptr,
-        wc.hInstance,
-        nullptr
-    );
-
-    if (!hWnd) {
-        //DWORD err = GetLastError();
-        //OutputDebugString(L"CreateWindowEx failed!");
-        return nullptr;
-    }
-
-    ShowWindow(hWnd, SW_HIDE);
-    return hWnd;
+    return HardwareSimulatorPlugin::GetStaticMonitors();
 }
 
 bool adjust_to_main_screen(int screen_index, double x_percent, double y_percent, LONG& out_x, LONG& out_y) {
@@ -589,7 +560,6 @@ void setDragWindowContents(bool enable) {
 // static
 void HardwareSimulatorPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
-  CreateHiddenMessageWindow();
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "hardware_simulator",
@@ -599,6 +569,7 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
   auto plugin_pointer = plugin.get();
 
   plugin->channel_ = std::move(channel);
+  plugin->registrar_ = registrar;  // Save registrar reference
 
   plugin->channel_->SetMethodCallHandler(
       [plugin_pointer](const auto &call, auto result) {
@@ -611,13 +582,36 @@ void HardwareSimulatorPlugin::RegisterWithRegistrar(
   }
 
   registrar->AddPlugin(std::move(plugin));
+
+  // start to monitor display resolution and DPI.
+  HardwareSimulatorPlugin::UpdateStaticMonitors();
+  dpi_monitor_proc_id_ = registrar->RegisterTopLevelWindowProcDelegate(
+      [](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
+          if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
+              HardwareSimulatorPlugin::UpdateStaticMonitors();
+          }
+          return std::nullopt;
+      });
 }
 
-HardwareSimulatorPlugin::HardwareSimulatorPlugin() {}
+HardwareSimulatorPlugin::HardwareSimulatorPlugin() {
+    // Initialize cursor lock members
+    cursor_locked_ = false;
+    raw_input_registered_ = false;
+    main_window_ = nullptr;
+    registrar_ = nullptr;
+    memset(&clip_rect_, 0, sizeof(clip_rect_));
+    memset(&locked_cursor_pos_, 0, sizeof(locked_cursor_pos_));
+}
 
 HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
     StopMonitorThread();
     destroyTouchDevice();
+    CleanupCursorLock();
+    if (dpi_monitor_proc_id_.has_value()) {
+        registrar_->UnregisterTopLevelWindowProcDelegate(dpi_monitor_proc_id_.value());
+        dpi_monitor_proc_id_.reset();
+    }
 }
 
 void async_send_input_retry(INPUT& i) {
@@ -773,6 +767,45 @@ void performMouseMoveAbsl(double x,double y,int screenId){
     send_input(i);
 }
 
+void performMouseMoveToWindowPosition(double percentx, double percenty) {
+    //if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
+
+    INPUT i{};
+
+    i.type = INPUT_MOUSE;
+    auto& mi = i.mi;
+
+    // Get the current window handle (Flutter window)
+    HWND hwnd = SmartKeyboardBlocker::target_window_;//GetForegroundWindow();
+    if (!hwnd) return;
+
+    // Get window rectangle (excluding title bar)
+    RECT windowRect;
+    if (!GetWindowRect(hwnd, &windowRect)) return;
+
+    // Get client area rectangle (excluding title bar and borders)
+    RECT clientRect;
+    if (!GetClientRect(hwnd, &clientRect)) return;
+
+    // Calculate the actual client area position on screen
+    POINT clientTopLeft = {0, 0};
+    if (!ClientToScreen(hwnd, &clientTopLeft)) return;
+
+    // Calculate target position based on percentages
+    int targetX = clientTopLeft.x + static_cast<int>(percentx * clientRect.right);
+    int targetY = clientTopLeft.y + static_cast<int>(percenty * clientRect.bottom);
+
+    // Convert to absolute screen coordinates (0-65535 range)
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+    mi.dx = (targetX * 65535) / screenWidth;
+    mi.dy = (targetY * 65535) / screenHeight;
+
+    send_input(i);
+}
+
 void scroll(int distance) {
     INPUT i{};
 
@@ -823,7 +856,7 @@ void HardwareSimulatorPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(version_stream.str()));
   } else if (method_call.method_name().compare("getMonitorCount") == 0) {
     int monitorCount = GetSystemMetrics(SM_CMONITORS);
-    update_monitors();
+    //update_monitors();
     result->Success(flutter::EncodableValue(monitorCount));
   } else if (method_call.method_name().compare("KeyPress") == 0) {
         auto keyCode = (args->find(flutter::EncodableValue("code")))->second;
@@ -840,6 +873,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto percenty = (args->find(flutter::EncodableValue("y")))->second;
         auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
         performMouseMoveAbsl(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))), static_cast<int>(std::get<int>((screenId))));
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("mouseMoveToWindowPosition") == 0) {
+        auto percentx = (args->find(flutter::EncodableValue("x")))->second;
+        auto percenty = (args->find(flutter::EncodableValue("y")))->second;
+        performMouseMoveToWindowPosition(static_cast<double>(std::get<double>((percentx))), static_cast<double>(std::get<double>((percenty))));
         result->Success(nullptr);
   } else if (method_call.method_name().compare("mousePress") == 0) {
         auto buttonid = (args->find(flutter::EncodableValue("buttonId")))->second;
@@ -876,6 +914,25 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("unhookCursorImage") == 0) {
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
         CursorMonitor::endHook(callbackID);
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("hookCursorPosition") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::startPositionHook([this, callbackID](int message, int screenId, double xPercent, double yPercent) {
+            flutter::EncodableMap encoded_message;
+            encoded_message[flutter::EncodableValue("callbackID")] = flutter::EncodableValue(callbackID);
+            encoded_message[flutter::EncodableValue("message")] = flutter::EncodableValue(message);
+            encoded_message[flutter::EncodableValue("screenId")] = flutter::EncodableValue(screenId);
+            encoded_message[flutter::EncodableValue("xPercent")] = flutter::EncodableValue(xPercent);
+            encoded_message[flutter::EncodableValue("yPercent")] = flutter::EncodableValue(yPercent);
+            if (channel_) {
+                channel_->InvokeMethod("onCursorPositionMessage", 
+                    std::make_unique<flutter::EncodableValue>(encoded_message));
+            }
+        }, callbackID);
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("unhookCursorPosition") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        CursorMonitor::endPositionHook(callbackID);
         result->Success(nullptr);
   } else if (method_call.method_name().compare("createGameController") == 0) {
         int hr = GameControllerManager::CreateGameController();
@@ -1179,6 +1236,12 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      bool immersive_enabled = static_cast<bool>(std::get<bool>((enabled)));
      setDragWindowContents(immersive_enabled);
      result->Success();
+  } else if (method_call.method_name().compare("lockCursor") == 0) {
+        LockCursor();
+        result->Success(flutter::EncodableValue(true));
+  } else if (method_call.method_name().compare("unlockCursor") == 0) {
+        UnlockCursor();
+        result->Success(flutter::EncodableValue(true));
   } else {
     result->NotImplemented();
   }
@@ -1213,5 +1276,177 @@ void HardwareSimulatorPlugin::OnKeyBlocked(const DWORD vk_code, bool isDown) {
             std::make_unique<flutter::EncodableValue>(message));
     }
 }
+
+// Cursor lock implementation
+void HardwareSimulatorPlugin::LockCursor() {
+    if (cursor_locked_) {
+        return; // Already locked
+    }
+
+    //if (!SmartKeyboardBlocker::IsTargetWindowActive()) return;
+    
+    // Find Flutter window
+    main_window_ = FindFlutterWindow();
+    if (!main_window_) {
+        return; // Could not find Flutter window
+    }
+    
+    // Get current cursor position and lock it there
+    if (!GetCursorPos(&locked_cursor_pos_)) {
+        return; // Could not get cursor position
+    }
+    
+    // Set clip rectangle to current cursor position (1x1 pixel)
+    clip_rect_.left = locked_cursor_pos_.x;
+    clip_rect_.top = locked_cursor_pos_.y;
+    clip_rect_.right = locked_cursor_pos_.x;
+    clip_rect_.bottom = locked_cursor_pos_.y;
+    
+    // Clip cursor to current position
+    if (!ClipCursor(&clip_rect_)) {
+        return; // Failed to clip cursor
+    }
+    
+    cursor_locked_ = true;
+    ShowCursor(!cursor_locked_);
+    // Subscribe to Raw Input for mouse movement tracking
+    if (!SubscribeToRawInputData()) {
+        // If Raw Input fails, unlock cursor
+        ClipCursor(nullptr);
+        cursor_locked_ = false;
+        ShowCursor(!cursor_locked_);
+        return;
+    }
+}
+
+void HardwareSimulatorPlugin::UnlockCursor() {
+    if (!cursor_locked_) {
+        return; // Already unlocked
+    }
+    
+    // Unclip cursor
+    ClipCursor(nullptr);
+    
+    // Unsubscribe from Raw Input
+    UnsubscribeFromRawInputData();
+    
+    cursor_locked_ = false;
+    ShowCursor(!cursor_locked_);
+    main_window_ = nullptr;
+}
+
+HWND HardwareSimulatorPlugin::FindFlutterWindow() {
+    if (!registrar_) return nullptr;
+    
+    // Get the native window from registrar
+    HWND native_window = GetParent(registrar_->GetView()->GetNativeWindow());
+    if (native_window) {
+        return native_window;
+    }
+    
+    // Fallback: try to find Flutter window by class name
+    HWND flutter_window = FindWindow(L"FLUTTER_RUNNER_WIN32_WINDOW", nullptr);
+    if (flutter_window) {
+        return flutter_window;
+    }
+    
+    // Try alternative window class names
+    flutter_window = FindWindow(L"FlutterWindow", nullptr);
+    if (flutter_window) {
+        return flutter_window;
+    }
+    
+    return nullptr;
+}
+
+void HardwareSimulatorPlugin::CleanupCursorLock() {
+    if (cursor_locked_) {
+        UnlockCursor();
+    }
+}
+
+bool HardwareSimulatorPlugin::SubscribeToRawInputData() {
+    if (raw_input_registered_) {
+        return true;
+    }
+    
+    if (!registrar_) return false;
+    
+    // Register raw input device
+    RAWINPUTDEVICE rid[1];
+    rid[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    rid[0].usUsage = HID_USAGE_GENERIC_MOUSE;
+    rid[0].dwFlags = RIDEV_INPUTSINK;
+    rid[0].hwndTarget = GetParent(registrar_->GetView()->GetNativeWindow());
+    
+    if (!RegisterRawInputDevices(rid, 1, sizeof(rid[0]))) {
+        return false;
+    }
+    
+    // Register top-level window procedure delegate to handle WM_INPUT
+    raw_input_proc_id_ = registrar_->RegisterTopLevelWindowProcDelegate(
+        [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
+            if (message == WM_INPUT && cursor_locked_) {
+                UINT dw_size = sizeof(RAWINPUT);
+                static BYTE lpb[sizeof(RAWINPUT)];
+                
+                if (GetRawInputData((HRAWINPUT)lparam, RID_INPUT, lpb, &dw_size, sizeof(RAWINPUTHEADER)) != -1) {
+                    RAWINPUT* raw = (RAWINPUT*)lpb;
+                    if (raw->header.dwType == RIM_TYPEMOUSE) {
+                        // Get relative mouse movement
+                        int deltaX = raw->data.mouse.lLastX;
+                        int deltaY = raw->data.mouse.lLastY;
+                        
+                        // Send mouse movement to Dart layer
+                        if (channel_) {
+                            flutter::EncodableMap move_message;
+                            move_message[flutter::EncodableValue("dx")] = flutter::EncodableValue(static_cast<double>(deltaX));
+                            move_message[flutter::EncodableValue("dy")] = flutter::EncodableValue(static_cast<double>(deltaY));
+                            
+                            channel_->InvokeMethod("onCursorMoved", 
+                                std::make_unique<flutter::EncodableValue>(move_message));
+                        }
+                    }
+                }
+                
+                // Process Raw Input
+                //DefRawInputProc((PRAWINPUT*)&lparam, 1, sizeof(RAWINPUTHEADER));
+                //return 0;
+            }
+
+            if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
+                HardwareSimulatorPlugin::UpdateStaticMonitors();
+            }
+
+            return std::nullopt;
+        });
+    
+    raw_input_registered_ = true;
+    return true;
+}
+
+void HardwareSimulatorPlugin::UnsubscribeFromRawInputData() {
+    if (!raw_input_registered_) {
+        return;
+    }
+    
+    // Unregister top-level window procedure delegate
+    if (raw_input_proc_id_.has_value()) {
+        registrar_->UnregisterTopLevelWindowProcDelegate(raw_input_proc_id_.value());
+        raw_input_proc_id_.reset();
+    }
+    
+    // Unregister raw input device
+    RAWINPUTDEVICE rid[1];
+    rid[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    rid[0].usUsage = HID_USAGE_GENERIC_MOUSE;
+    rid[0].dwFlags = RIDEV_REMOVE;
+    rid[0].hwndTarget = nullptr;
+    RegisterRawInputDevices(rid, 1, sizeof(RAWINPUTDEVICE));
+    
+    raw_input_registered_ = false;
+}
+
+
 
 }  // namespace hardware_simulator

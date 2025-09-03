@@ -2,12 +2,15 @@ PODS:
   - FlutterMacOS (1.0.0)
   - hardware_simulator (0.0.1):
     - FlutterMacOS
+  - pointer_lock (0.0.1):
+    - FlutterMacOS
   - url_launcher_macos (0.0.1):
     - FlutterMacOS
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
   - hardware_simulator (from `Flutter/ephemeral/.symlinks/plugins/hardware_simulator/macos`)
+  - pointer_lock (from `Flutter/ephemeral/.symlinks/plugins/pointer_lock/macos`)
   - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
 
 EXTERNAL SOURCES:
@@ -15,12 +18,15 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   hardware_simulator:
     :path: Flutter/ephemeral/.symlinks/plugins/hardware_simulator/macos
+  pointer_lock:
+    :path: Flutter/ephemeral/.symlinks/plugins/pointer_lock/macos
   url_launcher_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
 
 SPEC CHECKSUMS:
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
   hardware_simulator: 46262bc15a8abbee9036b124102940c46fbec9a5
+  pointer_lock: 7ad2bb6c49ec44c24e195068856787be47e4a657
   url_launcher_macos: c82c93949963e55b228a30115bd219499a6fe404
 
 PODFILE CHECKSUM: 236401fc2c932af29a9fcf0e97baeeb2d750d367

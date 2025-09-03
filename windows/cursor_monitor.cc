@@ -1,4 +1,5 @@
 #include "cursor_monitor.h"
+#include "hardware_simulator_plugin.h"
 
 #include <windows.h>
 #include <string>
@@ -14,6 +15,11 @@ const int kBytesPerPixel = 4;
 static std::map<long long, std::unordered_set<uint32_t>> cachedcursors;
 static std::map<long long, CursorChangedCallback> callbacks;
 static std::map<long long, bool> hookAllCursorImage;
+
+// Position monitoring callbacks and state
+static std::map<long long, CursorPositionCallback> positionCallbacks;
+static HHOOK positionHook = nullptr;
+static POINT lastCursorPos = {0, 0};
 
 bool HasAlphaChannel(const uint32_t* data, int stride, int width, int height) {
     const RGBQUAD* plane = reinterpret_cast<const RGBQUAD*>(data);
@@ -453,19 +459,11 @@ MousePosition GetMousePositionAndScreenId() {
     monitorInfo.cbSize = sizeof(MONITORINFOEX);
     GetMonitorInfo(hMonitor, &monitorInfo);
 
-    static std::vector<RECT> monitors;
-    static bool monitorsInitialized = false;
-
-    if (!monitorsInitialized) {
-        monitors.clear();
-        EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMon, HDC, LPRECT rect, LPARAM data) {
-            auto& list = *reinterpret_cast<std::vector<RECT>*>(data);
-            MONITORINFO info{ sizeof(MONITORINFO) };
-            GetMonitorInfo(hMon, &info);
-            list.push_back(info.rcMonitor);
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&monitors));
-        monitorsInitialized = true;
+    // Use HardwareSimulatorPlugin's static monitors
+    const auto& monitors_info = hardware_simulator::HardwareSimulatorPlugin::GetStaticMonitors();
+    std::vector<RECT> monitors;
+    for (const auto& info : monitors_info) {
+        monitors.push_back(info.rect);
     }
 
     int screenId = 0;
@@ -490,28 +488,64 @@ MousePosition GetMousePositionAndScreenId() {
     return {screenId, xPercent, yPercent};
 }
 
-std::vector<uint8_t> FloatToBytes(float x, float y) {
-    std::vector<uint8_t> bytes;
-    bytes.resize(sizeof(float) * 2);
-    
-    bool isLittleEndian = test_endian() == 0;
-    
-    uint8_t* xBytes = reinterpret_cast<uint8_t*>(&x);
-    uint8_t* yBytes = reinterpret_cast<uint8_t*>(&y);
-    
-    if (isLittleEndian) {
-        for (size_t i = 0; i < sizeof(float); ++i) {
-            bytes[i] = xBytes[i];
-            bytes[i + sizeof(float)] = yBytes[i];
-        }
-    } else {
-        for (size_t i = 0; i < sizeof(float); ++i) {
-            bytes[i] = xBytes[sizeof(float) - 1 - i];
-            bytes[i + sizeof(float)] = yBytes[sizeof(float) - 1 - i];
+// Low-level mouse hook procedure for position monitoring
+LRESULT CALLBACK MousePositionHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode >= 0 && wParam == WM_MOUSEMOVE) {
+        POINT currentPos;
+        GetCursorPos(&currentPos);
+        
+        // Check if position has changed
+        if (currentPos.x != lastCursorPos.x || currentPos.y != lastCursorPos.y) {
+            lastCursorPos = currentPos;
+            
+            // Get mouse position and screen info
+            MousePosition mousePos = GetMousePositionAndScreenId();
+            
+            // Notify all position callbacks with direct double values
+            for (auto& callback : positionCallbacks) {
+                callback.second(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+            }
         }
     }
     
-    return bytes;
+    return CallNextHookEx(positionHook, nCode, wParam, lParam);
+}
+
+std::vector<uint8_t> FloatToBytes(float x, float y) {
+    std::vector<uint8_t> outputArray;
+    outputArray.reserve(sizeof(float) * 2);
+
+    // Add x coordinate
+    uint8_t* xBytes = reinterpret_cast<uint8_t*>(&x);
+    if (test_endian()) {
+        // Little endian system
+        for (size_t i = 0; i < sizeof(x); ++i) {
+            outputArray.push_back(xBytes[i]);
+        }
+    }
+    else {
+        // Big endian system
+        for (size_t i = sizeof(x); i > 0; --i) {
+            outputArray.push_back(xBytes[i - 1]);
+        }
+    }
+
+    // Add y coordinate
+    uint8_t* yBytes = reinterpret_cast<uint8_t*>(&y);
+    if (test_endian()) {
+        // Little endian system
+        for (size_t i = 0; i < sizeof(y); ++i) {
+            outputArray.push_back(yBytes[i]);
+        }
+    }
+    else {
+        // Big endian system
+        for (size_t i = sizeof(y); i > 0; --i) {
+            outputArray.push_back(yBytes[i - 1]);
+        }
+    }
+
+    return outputArray;
 }
 
 bool IsCursorVisible() {
@@ -571,7 +605,7 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
     hookAllCursorImage[callback_id] = hookAll;
     cachedcursors[callback_id] = {};
 
-    if (IsCursorVisible()) {
+    if (!IsCursorVisible()) {
         MousePosition mousePos = GetMousePositionAndScreenId();
         std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
         callback(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
@@ -601,4 +635,93 @@ void CursorMonitor::endHook(long long callback_id) {
     if (callbacks.empty()) {
         UnhookWinEvent(Global_HOOK);
     }
+}
+
+void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long callback_id) {
+    positionCallbacks[callback_id] = callback;
+    
+    // Start hook thread if this is the first position callback
+    // We have to do this: https://www.soinside.com/question/hP9qqHrPWatdNm68nNtFfd
+    if (positionCallbacks.size() == 1) {
+        startHookThread();
+        GetCursorPos(&lastCursorPos);
+    }
+    
+    // Send initial position
+    MousePosition mousePos = GetMousePositionAndScreenId();
+    callback(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+}
+
+void CursorMonitor::endPositionHook(long long callback_id) {
+    positionCallbacks.erase(positionCallbacks.find(callback_id));
+    
+    // Stop hook thread if no more position callbacks
+    if (positionCallbacks.empty()) {
+        stopHookThread();
+    }
+}
+
+// Static member definitions for thread management
+std::unique_ptr<std::thread> CursorMonitor::hookThread = nullptr;
+std::atomic<bool> CursorMonitor::shouldStopHookThread{false};
+std::atomic<bool> CursorMonitor::hookThreadRunning{false};
+
+void CursorMonitor::startHookThread() {
+    if (hookThreadRunning.load()) {
+        return; // Thread already running
+    }
+    
+    shouldStopHookThread.store(false);
+    hookThread = std::make_unique<std::thread>(hookThreadFunction);
+}
+
+void CursorMonitor::stopHookThread() {
+    if (!hookThreadRunning.load()) {
+        return; // Thread not running
+    }
+    
+    shouldStopHookThread.store(true);
+    
+    if (hookThread && hookThread->joinable()) {
+        hookThread->join();
+    }
+    
+    hookThread.reset();
+    hookThreadRunning.store(false);
+}
+
+void CursorMonitor::hookThreadFunction() {
+    hookThreadRunning.store(true);
+    
+    // Install the hook in this thread
+    positionHook = SetWindowsHookEx(WH_MOUSE_LL, MousePositionHookProc, GetModuleHandle(nullptr), 0);
+    
+    if (positionHook == nullptr) {
+        hookThreadRunning.store(false);
+        return;
+    }
+    
+    // Message loop for the hook thread
+    MSG msg;
+    while (!shouldStopHookThread.load()) {
+        // Get message with timeout to allow checking shouldStopHookThread
+        BOOL result = GetMessage(&msg, nullptr, 0, 0);
+        
+        if (result == 0 || result == -1) {
+            // WM_QUIT or error
+            break;
+        }
+        
+        // Process the message
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    
+    // Clean up hook
+    if (positionHook != nullptr) {
+        UnhookWindowsHookEx(positionHook);
+        positionHook = nullptr;
+    }
+    
+    hookThreadRunning.store(false);
 }

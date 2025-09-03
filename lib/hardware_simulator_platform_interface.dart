@@ -13,6 +13,8 @@ typedef KeyBlockedCallback = void Function(int keyCode, bool isDown);
 typedef CursorWheelCallback = void Function(double deltaX, double deltaY);
 typedef CursorImageUpdatedCallback = void Function(
     int message, int messageInfo, Uint8List cursorImage);
+typedef CursorPositionUpdatedCallback = void Function(
+    int message, int screenId, double xPercent, double yPercent);
 
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
@@ -130,6 +132,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
         'removeCursorImageUpdated() has not been implemented.');
   }
 
+  void addCursorPositionUpdated(
+      CursorPositionUpdatedCallback callback, int callbackId) {
+    throw UnimplementedError(
+        'addCursorPositionUpdated() has not been implemented.');
+  }
+
+  void removeCursorPositionUpdated(int callbackId) {
+    throw UnimplementedError(
+        'removeCursorPositionUpdated() has not been implemented.');
+  }
+
   Future<void> performKeyEvent(int keyCode, bool isDown) async {
     throw UnimplementedError('performKeyEvent() has not been implemented.');
   }
@@ -146,6 +159,13 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
       double percentx, double percenty, int screenId) async {
     throw UnimplementedError(
         'performMouseMoveAbsl() has not been implemented.');
+  }
+
+  // Move mouse to window position. x, y is the percentage of the current window (excluding title bar) ranged from 0 - 1.
+  Future<void> performMouseMoveToWindowPosition(
+      double percentx, double percenty) async {
+    throw UnimplementedError(
+        'performMouseMoveToWindowPosition() has not been implemented.');
   }
 
   Future<void> performMouseClick(int buttonId, bool isDown) async {

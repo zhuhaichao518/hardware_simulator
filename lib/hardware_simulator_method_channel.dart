@@ -15,7 +15,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   final methodChannel = const MethodChannel('hardware_simulator');
   bool isinitialized = false;
 
-  // pointer lock on windows and linux.
+  // pointer lock on linux.
   StreamSubscription<PointerLockMoveEvent>? _pointerLockSubscription;
 
   void init() {
@@ -44,6 +44,16 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
           cursorImageCallbacks[callbackID]!(call.arguments['message'],
               call.arguments['msg_info'], call.arguments['cursorImage']);
         }
+      } else if (call.method == "onCursorPositionMessage") {
+        int callbackID = call.arguments['callbackID'];
+        if (cursorPositionCallbacks.containsKey(callbackID)) {
+          // Directly get double values from arguments
+          double xPercent = call.arguments['xPercent'];
+          double yPercent = call.arguments['yPercent'];
+          
+          cursorPositionCallbacks[callbackID]!(call.arguments['message'],
+              call.arguments['screenId'], xPercent, yPercent);
+        }
       } else if (call.method == "onKeyBlocked") {
         int keyCode = call.arguments['keyCode'];
         bool isDown = call.arguments['isDown'];
@@ -69,14 +79,13 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> lockCursor() async {
-    // use pointer_lock on windows and linux.
-    if (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux) {
+    // use pointer_lock on linux, native implementation on windows and other platforms.
+    if (defaultTargetPlatform == TargetPlatform.linux) {
       await _pointerLockSubscription?.cancel();
 
       _pointerLockSubscription = pointerLock
           .createSession(
-        windowsMode: PointerLockWindowsMode.capture,
+        windowsMode: PointerLockWindowsMode.clip,
         cursor: PointerLockCursor.hidden,
         unlockOnPointerUp: false, // 手动控制解锁
       )
@@ -100,8 +109,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   @override
   Future<void> unlockCursor() async {
-    if (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux) {
+    if (defaultTargetPlatform == TargetPlatform.linux) {
       await _pointerLockSubscription?.cancel();
       _pointerLockSubscription = null;
     } else {
@@ -220,6 +228,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   final Map<int, CursorImageUpdatedCallback> cursorImageCallbacks = {};
+  final Map<int, CursorPositionUpdatedCallback> cursorPositionCallbacks = {};
 
   @override
   void addCursorImageUpdated(
@@ -241,6 +250,29 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       cursorImageCallbacks.remove(callbackId);
     }
     methodChannel.invokeMethod('unhookCursorImage', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void addCursorPositionUpdated(
+      CursorPositionUpdatedCallback callback, int callbackId) {
+    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
+    if (!isinitialized) init();
+    cursorPositionCallbacks[callbackId] = callback;
+    methodChannel.invokeMethod('hookCursorPosition', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void removeCursorPositionUpdated(int callbackId) {
+    if (cursorPositionCallbacks.containsKey(callbackId)) {
+      cursorPositionCallbacks.remove(callbackId);
+    }
+    methodChannel.invokeMethod('unhookCursorPosition', {
       'callbackID': callbackId,
     });
   }
@@ -272,6 +304,15 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'x': percentx,
       'y': percenty,
       'screenId': screenId,
+    });
+  }
+
+  @override
+  Future<void> performMouseMoveToWindowPosition(
+      double percentx, double percenty) async {
+    await methodChannel.invokeMethod('mouseMoveToWindowPosition', {
+      'x': percentx,
+      'y': percenty,
     });
   }
 

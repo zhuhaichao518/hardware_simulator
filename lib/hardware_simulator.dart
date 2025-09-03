@@ -20,6 +20,11 @@ class HWMouse {
         .performMouseMoveAbsl(percentx, percenty, screenId);
   }
 
+  void performMouseMoveToWindowPosition(double percentx, double percenty) {
+    HardwareSimulatorPlatform.instance
+        .performMouseMoveToWindowPosition(percentx, percenty);
+  }
+
   // mouse left button id 1, right button id 3
   void performMouseClick(int buttonId, bool isDown) {
     HardwareSimulatorPlatform.instance.performMouseClick(buttonId, isDown);
@@ -154,6 +159,8 @@ class HardwareSimulator {
   static const int CURSOR_UPDATED_IMAGE = 4;
   // ignore: constant_identifier_names
   static const int CURSOR_UPDATED_CACHED = 5;
+  // ignore: constant_identifier_names
+  static const int CURSOR_POSITION_CHANGED = 6;
   
   // hook_all means we stream cursor image including standard system cursor.
   static void addCursorImageUpdated(
@@ -164,6 +171,17 @@ class HardwareSimulator {
 
   static void removeCursorImageUpdated(int callbackId) {
     HardwareSimulatorPlatform.instance.removeCursorImageUpdated(callbackId);
+  }
+
+  // Monitor cursor position changes with screenId, xPercent, yPercent
+  static void addCursorPositionUpdated(
+      CursorPositionUpdatedCallback callback, int callbackId) {
+    HardwareSimulatorPlatform.instance
+        .addCursorPositionUpdated(callback, callbackId);
+  }
+
+  static void removeCursorPositionUpdated(int callbackId) {
+    HardwareSimulatorPlatform.instance.removeCursorPositionUpdated(callbackId);
   }
 
   HWKeyboard getKeyboard() {
