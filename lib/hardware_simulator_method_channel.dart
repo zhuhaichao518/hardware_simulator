@@ -486,4 +486,11 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'enabled': enabled,
     });
   }
+
+  @override
+  Future<void> setDragWindowContents(bool enabled) async {
+    await methodChannel.invokeMethod('setDragWindowContents', {
+      'enabled': enabled,
+    });
+  }
 }

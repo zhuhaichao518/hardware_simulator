@@ -265,6 +265,10 @@ class HardwareSimulator {
     }
     return MultiDisplayMode.unknown;
   }
+
+  static Future<void> setDragWindowContents(bool enabled) {
+    return HardwareSimulatorPlatform.instance.setDragWindowContents(enabled);
+  }
 }
 
 // Enums for display management

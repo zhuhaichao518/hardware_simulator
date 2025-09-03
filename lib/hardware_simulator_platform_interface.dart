@@ -254,4 +254,9 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   Future<int> getCurrentMultiDisplayMode() {
     throw UnimplementedError('getCurrentMultiDisplayMode() has not been implemented.');
   }
+
+  Future<void> setDragWindowContents(bool enabled) async {
+    throw UnimplementedError(
+        'setDragWindowContents() has not been implemented.');
+  }
 }

@@ -540,6 +540,23 @@ bool RunBatchAsAdmin(
     return true;
 }
 
+// https://sunlogin.oray.com/news/16158.html
+void setDragWindowContents(bool enable) {
+  HKEY hKey;
+  if (RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("Control Panel\\Desktop"), 0,
+                   KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+    DWORD value = enable ? 1 : 0;
+    RegSetValueEx(hKey, TEXT("DragFullWindows"), 0, REG_DWORD,
+                  (const BYTE *)&value, sizeof(value));
+    RegCloseKey(hKey);
+    SystemParametersInfo(SPI_SETDRAGFULLWINDOWS, value, nullptr,
+                         SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+
+  } else {
+    std::cerr << "Failed to open registry key." << std::endl;
+  }
+}
+
 // static
 void HardwareSimulatorPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
@@ -1214,6 +1231,11 @@ void HardwareSimulatorPlugin::HandleMethodCall(
      bool immersive_enabled = static_cast<bool>(std::get<bool>((enabled)));
      SetImmersiveMode(immersive_enabled);
      result->Success(flutter::EncodableValue(true));
+  } else if (method_call.method_name().compare("setDragWindowContents") == 0) {
+     auto enabled = (args->find(flutter::EncodableValue("enabled")))->second;
+     bool immersive_enabled = static_cast<bool>(std::get<bool>((enabled)));
+     setDragWindowContents(immersive_enabled);
+     result->Success();
   } else if (method_call.method_name().compare("lockCursor") == 0) {
         LockCursor();
         result->Success(flutter::EncodableValue(true));
