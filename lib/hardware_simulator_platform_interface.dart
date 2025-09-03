@@ -259,4 +259,8 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError(
         'setDragWindowContents() has not been implemented.');
   }
+
+  Future<void> clearAllPressedEvents() async {
+    throw UnimplementedError('clearAllPressedEvents() has not been implemented.');
+  }
 }

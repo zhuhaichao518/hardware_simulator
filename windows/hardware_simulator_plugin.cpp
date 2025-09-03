@@ -41,6 +41,7 @@ namespace hardware_simulator {
 // Function declarations
 void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat);
 void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown, bool isRepeat);
+void clearAllPressedEvents();
 
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 PFN_CreateSyntheticPointerDevice fnCreateSyntheticPointerDevice = nullptr;
@@ -737,6 +738,45 @@ void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat = false) {
     }
 }
 
+void clearAllPressedEvents() {
+    std::lock_guard<std::mutex> lock(g_event_mutex);
+    
+    // Clear all pressed keyboard keys
+    for (auto& [keyCode, state] : g_key_states) {
+        if (state.isDown) {
+            performKeyEvent(keyCode, false); // Send key up event
+        }
+    }
+    g_key_states.clear();
+    g_last_known_key_down = 0;
+    
+    // Clear all pressed touch points
+    for (auto& [touchId, state] : g_touch_states) {
+        if (state.isDown) {
+            performTouchEvent(state.screenId, state.x, state.y, touchId, false); // Send touch up event
+        }
+    }
+    g_touch_states.clear();
+    
+    // Clear mouse buttons (left and right)
+    // Check if mouse buttons are currently pressed using GetAsyncKeyState
+    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+        performMouseButton(1, true); // Left button up
+    }
+    if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
+        performMouseButton(3, true); // Right button up
+    }
+    if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) {
+        performMouseButton(2, true); // Middle button up
+    }
+    if (GetAsyncKeyState(VK_XBUTTON1) & 0x8000) {
+        performMouseButton(4, true); // XButton1 up
+    }
+    if (GetAsyncKeyState(VK_XBUTTON2) & 0x8000) {
+        performMouseButton(5, true); // XButton2 up
+    }
+}
+
 void performMouseMoveRelative(double x,double y){
     INPUT i {};
 
@@ -1004,6 +1044,9 @@ void HardwareSimulatorPlugin::HandleMethodCall(
             static_cast<double>(std::get<double>((y))),
             static_cast<uint32_t>(std::get<int>((touchId)))
         );
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("clearAllPressedEvents") == 0) {
+        clearAllPressedEvents();
         result->Success(nullptr);
   } else if (method_call.method_name().compare("initParsecVdd") == 0) {
     if (!VirtualDisplayControl::IsInitialized()) {

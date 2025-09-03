@@ -207,6 +207,10 @@ class HardwareSimulator {
     return GameController.createGameController();
   }
 
+  static Future<void> clearAllPressedEvents() async {
+    await HardwareSimulatorPlatform.instance.clearAllPressedEvents();
+  }
+
   static Future<bool> initParsecVdd() {
     return HardwareSimulatorPlatform.instance.initParsecVdd();
   }

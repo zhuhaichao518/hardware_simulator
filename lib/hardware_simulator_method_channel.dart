@@ -493,4 +493,9 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'enabled': enabled,
     });
   }
+
+  @override
+  Future<void> clearAllPressedEvents() async {
+    await methodChannel.invokeMethod('clearAllPressedEvents');
+  }
 }
