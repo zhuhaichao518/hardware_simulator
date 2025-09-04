@@ -263,4 +263,8 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   Future<void> clearAllPressedEvents() async {
     throw UnimplementedError('clearAllPressedEvents() has not been implemented.');
   }
+
+  Future<bool> setPrimaryDisplay(int displayIndex) async {
+    throw UnimplementedError('setPrimaryDisplay() has not been implemented.');
+  }
 }

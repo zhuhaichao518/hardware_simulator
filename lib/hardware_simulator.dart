@@ -211,6 +211,10 @@ class HardwareSimulator {
     await HardwareSimulatorPlatform.instance.clearAllPressedEvents();
   }
 
+  static Future<bool> setPrimaryDisplay(int displayIndex) async {
+    return await HardwareSimulatorPlatform.instance.setPrimaryDisplay(displayIndex);
+  }
+
   static Future<bool> initParsecVdd() {
     return HardwareSimulatorPlatform.instance.initParsecVdd();
   }

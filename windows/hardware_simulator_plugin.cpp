@@ -42,6 +42,7 @@ namespace hardware_simulator {
 void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat);
 void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown, bool isRepeat);
 void clearAllPressedEvents();
+bool setPrimaryDisplay(int displayIndex);
 
 thread_local HDESK _lastKnownInputDesktop = nullptr;
 PFN_CreateSyntheticPointerDevice fnCreateSyntheticPointerDevice = nullptr;
@@ -777,6 +778,39 @@ void clearAllPressedEvents() {
     }
 }
 
+bool setPrimaryDisplay(int displayIndex) {
+    // Use ChangeDisplaySettingsEx method
+    DEVMODE devMode = {};
+    devMode.dmSize = sizeof(DEVMODE);
+    
+    // Get display device information
+    DISPLAY_DEVICE displayDevice = {};
+    displayDevice.cb = sizeof(DISPLAY_DEVICE);
+    
+    if (!EnumDisplayDevices(nullptr, displayIndex, &displayDevice, 0)) {
+        return false;
+    }
+    
+    // Get current display mode
+    if (!EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+        return false;
+    }
+    
+    // Set as primary display
+    devMode.dmFields = DM_POSITION;
+    devMode.dmPosition.x = 0;
+    devMode.dmPosition.y = 0;
+    
+    // Apply settings
+    LONG result = ChangeDisplaySettingsEx(displayDevice.DeviceName, 
+                                        &devMode, 
+                                        nullptr, 
+                                        CDS_SET_PRIMARY | CDS_UPDATEREGISTRY, 
+                                        nullptr);
+    
+    return (result == DISP_CHANGE_SUCCESSFUL);
+}
+
 void performMouseMoveRelative(double x,double y){
     INPUT i {};
 
@@ -1048,6 +1082,10 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("clearAllPressedEvents") == 0) {
         clearAllPressedEvents();
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("setPrimaryDisplay") == 0) {
+        auto displayIndex = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("displayIndex")))->second));
+        bool success = setPrimaryDisplay(displayIndex);
+        result->Success(flutter::EncodableValue(success));
   } else if (method_call.method_name().compare("initParsecVdd") == 0) {
     if (!VirtualDisplayControl::IsInitialized()) {
       if (VirtualDisplayControl::Initialize()) {

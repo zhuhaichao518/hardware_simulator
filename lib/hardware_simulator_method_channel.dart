@@ -498,4 +498,11 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   Future<void> clearAllPressedEvents() async {
     await methodChannel.invokeMethod('clearAllPressedEvents');
   }
+
+  @override
+  Future<bool> setPrimaryDisplay(int displayIndex) async {
+    return await methodChannel.invokeMethod('setPrimaryDisplay', {
+      'displayIndex': displayIndex,
+    });
+  }
 }
