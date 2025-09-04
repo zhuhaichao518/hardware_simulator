@@ -169,6 +169,9 @@ HDESK syncThreadDesktop() {
 
 std::optional<int> HardwareSimulatorPlugin::dpi_monitor_proc_id_ = NULL;
 std::vector<MonitorInfo> HardwareSimulatorPlugin::static_monitors_;
+std::map<int, std::function<void(int)>> HardwareSimulatorPlugin::display_count_callbacks_;
+std::mutex HardwareSimulatorPlugin::display_count_callbacks_mutex_;
+int HardwareSimulatorPlugin::previous_display_count_ = 0;
 
 void HardwareSimulatorPlugin::UpdateStaticMonitors() {
     static_monitors_.clear();
@@ -204,6 +207,13 @@ void HardwareSimulatorPlugin::UpdateStaticMonitors() {
                 static_monitors_.push_back(info);
             }
         }
+    }
+    
+    // Check if display count changed and notify callbacks
+    int current_display_count = static_cast<int>(static_monitors_.size());
+    if (current_display_count != previous_display_count_) {
+        previous_display_count_ = current_display_count;
+        notifyDisplayCountChanged(current_display_count);
     }
 }
 
@@ -1008,6 +1018,22 @@ void HardwareSimulatorPlugin::HandleMethodCall(
         auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
         CursorMonitor::endPositionHook(callbackID);
         result->Success(nullptr);
+  } else if (method_call.method_name().compare("addDisplayCountChangedCallback") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        addDisplayCountChangedCallback([this, callbackID](int displayCount) {
+            flutter::EncodableMap encoded_message;
+            encoded_message[flutter::EncodableValue("callbackID")] = flutter::EncodableValue(callbackID);
+            encoded_message[flutter::EncodableValue("displayCount")] = flutter::EncodableValue(displayCount);
+            if (channel_) {
+                channel_->InvokeMethod("onDisplayCountChanged", 
+                    std::make_unique<flutter::EncodableValue>(encoded_message));
+            }
+        }, callbackID);
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("removeDisplayCountChangedCallback") == 0) {
+        auto callbackID = static_cast<int>(std::get<int>((args->find(flutter::EncodableValue("callbackID")))->second));
+        removeDisplayCountChangedCallback(callbackID);
+        result->Success(nullptr);
   } else if (method_call.method_name().compare("createGameController") == 0) {
         int hr = GameControllerManager::CreateGameController();
         result->Success(flutter::EncodableValue(hr));
@@ -1528,6 +1554,22 @@ void HardwareSimulatorPlugin::UnsubscribeFromRawInputData() {
     raw_input_registered_ = false;
 }
 
+// Display count change callback management
+void HardwareSimulatorPlugin::addDisplayCountChangedCallback(std::function<void(int)> callback, int callbackId) {
+    std::lock_guard<std::mutex> lock(display_count_callbacks_mutex_);
+    display_count_callbacks_[callbackId] = callback;
+}
 
+void HardwareSimulatorPlugin::removeDisplayCountChangedCallback(int callbackId) {
+    std::lock_guard<std::mutex> lock(display_count_callbacks_mutex_);
+    display_count_callbacks_.erase(callbackId);
+}
+
+void HardwareSimulatorPlugin::notifyDisplayCountChanged(int displayCount) {
+    std::lock_guard<std::mutex> lock(display_count_callbacks_mutex_);
+    for (auto& pair : display_count_callbacks_) {
+        pair.second(displayCount);
+    }
+}
 
 }  // namespace hardware_simulator

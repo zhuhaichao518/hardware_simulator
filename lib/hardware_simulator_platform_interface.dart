@@ -15,6 +15,7 @@ typedef CursorImageUpdatedCallback = void Function(
     int message, int messageInfo, Uint8List cursorImage);
 typedef CursorPositionUpdatedCallback = void Function(
     int message, int screenId, double xPercent, double yPercent);
+typedef DisplayCountChangedCallback = void Function(int displayCount);
 
 abstract class HardwareSimulatorPlatform extends PlatformInterface {
   /// Constructs a HardwareSimulatorPlatform.
@@ -141,6 +142,18 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   void removeCursorPositionUpdated(int callbackId) {
     throw UnimplementedError(
         'removeCursorPositionUpdated() has not been implemented.');
+  }
+
+  // Display count change callbacks
+  void addDisplayCountChangedCallback(
+      DisplayCountChangedCallback callback, int callbackId) {
+    throw UnimplementedError(
+        'addDisplayCountChangedCallback() has not been implemented.');
+  }
+
+  void removeDisplayCountChangedCallback(int callbackId) {
+    throw UnimplementedError(
+        'removeDisplayCountChangedCallback() has not been implemented.');
   }
 
   Future<void> performKeyEvent(int keyCode, bool isDown) async {

@@ -60,6 +60,11 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
         for (var callback in keyBlockedCallbacks) {
           callback(keyCode, isDown);
         }
+      } else if (call.method == "onDisplayCountChanged") {
+        int callbackID = call.arguments['callbackID'];
+        if (displayCountCallbacks.containsKey(callbackID)) {
+          displayCountCallbacks[callbackID]!(call.arguments['displayCount']);
+        }
       }
       return null;
     });
@@ -229,6 +234,7 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
 
   final Map<int, CursorImageUpdatedCallback> cursorImageCallbacks = {};
   final Map<int, CursorPositionUpdatedCallback> cursorPositionCallbacks = {};
+  final Map<int, DisplayCountChangedCallback> displayCountCallbacks = {};
 
   @override
   void addCursorImageUpdated(
@@ -273,6 +279,32 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       cursorPositionCallbacks.remove(callbackId);
     }
     methodChannel.invokeMethod('unhookCursorPosition', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void addDisplayCountChangedCallback(
+      DisplayCountChangedCallback callback, int callbackId) {
+    if (kIsWeb || Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
+    if (!isinitialized) init();
+    if (displayCountCallbacks.containsKey(callbackId)) {
+      displayCountCallbacks.remove(callbackId);
+    }
+    displayCountCallbacks[callbackId] = callback;
+    methodChannel.invokeMethod('addDisplayCountChangedCallback', {
+      'callbackID': callbackId,
+    });
+  }
+
+  @override
+  void removeDisplayCountChangedCallback(int callbackId) {
+    if (displayCountCallbacks.containsKey(callbackId)) {
+      displayCountCallbacks.remove(callbackId);
+    }
+    methodChannel.invokeMethod('removeDisplayCountChangedCallback', {
       'callbackID': callbackId,
     });
   }

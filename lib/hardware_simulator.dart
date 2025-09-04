@@ -184,6 +184,17 @@ class HardwareSimulator {
     HardwareSimulatorPlatform.instance.removeCursorPositionUpdated(callbackId);
   }
 
+  // Display count change callbacks
+  static void addDisplayCountChangedCallback(
+      DisplayCountChangedCallback callback, int callbackId) {
+    HardwareSimulatorPlatform.instance
+        .addDisplayCountChangedCallback(callback, callbackId);
+  }
+
+  static void removeDisplayCountChangedCallback(int callbackId) {
+    HardwareSimulatorPlatform.instance.removeDisplayCountChangedCallback(callbackId);
+  }
+
   HWKeyboard getKeyboard() {
     return HWKeyboard();
   }

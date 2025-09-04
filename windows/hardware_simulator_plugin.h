@@ -6,9 +6,12 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <windows.h>
 #include <vector>
+#include <functional>
+#include <map>
 #include "SmartKeyboardBlocker.h"
 
 struct MonitorInfo {
@@ -51,6 +54,11 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
   // Static monitor management
   static void UpdateStaticMonitors();
   static const std::vector<MonitorInfo>& GetStaticMonitors();
+  
+  // Display count change callback management
+  static void addDisplayCountChangedCallback(std::function<void(int)> callback, int callbackId);
+  static void removeDisplayCountChangedCallback(int callbackId);
+  static void notifyDisplayCountChanged(int displayCount);
 
  private:
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
@@ -71,6 +79,11 @@ class HardwareSimulatorPlugin : public flutter::Plugin {
   
   // Static monitor management
   static std::vector<MonitorInfo> static_monitors_;
+  
+  // Display count change callbacks
+  static std::map<int, std::function<void(int)>> display_count_callbacks_;
+  static std::mutex display_count_callbacks_mutex_;
+  static int previous_display_count_;
   
   // Helper methods for cursor lock
   void CleanupCursorLock();
