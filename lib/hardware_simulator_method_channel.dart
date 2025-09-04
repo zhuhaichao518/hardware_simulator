@@ -513,6 +513,23 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
+  Future<bool> setPrimaryDisplayOnly(int displayUid) async {
+    return await methodChannel.invokeMethod('setPrimaryDisplayOnly', {
+      'displayUid': displayUid,
+    });
+  }
+
+  @override
+  Future<bool> restoreDisplayConfiguration() async {
+    return await methodChannel.invokeMethod('restoreDisplayConfiguration');
+  }
+
+  @override
+  Future<bool> hasPendingConfiguration() async {
+    return await methodChannel.invokeMethod('hasPendingConfiguration');
+  }
+
+  @override
   Future<bool> putImmersiveModeEnabled(bool enabled) async {
     return await methodChannel.invokeMethod('putImmersiveModeEnabled', {
       'enabled': enabled,

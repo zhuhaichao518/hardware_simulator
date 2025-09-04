@@ -285,6 +285,19 @@ class HardwareSimulator {
     return MultiDisplayMode.unknown;
   }
 
+  // Display control APIs for setting primary display and disabling others
+  static Future<bool> setPrimaryDisplayOnly(int displayUid) {
+    return HardwareSimulatorPlatform.instance.setPrimaryDisplayOnly(displayUid);
+  }
+
+  static Future<bool> restoreDisplayConfiguration() {
+    return HardwareSimulatorPlatform.instance.restoreDisplayConfiguration();
+  }
+
+  static Future<bool> hasPendingConfiguration() {
+    return HardwareSimulatorPlatform.instance.hasPendingConfiguration();
+  }
+
   static Future<void> setDragWindowContents(bool enabled) {
     return HardwareSimulatorPlatform.instance.setDragWindowContents(enabled);
   }

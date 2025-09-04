@@ -1333,6 +1333,24 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("getCurrentMultiDisplayMode") == 0) {
      VirtualDisplayControl::MultiDisplayMode mode = VirtualDisplayControl::GetCurrentMultiDisplayMode();
      result->Success(flutter::EncodableValue(static_cast<int>(mode)));
+  } else if (method_call.method_name().compare("setPrimaryDisplayOnly") == 0) {
+     auto display_uid_it = args->find(flutter::EncodableValue("displayUid"));
+     
+     if (display_uid_it == args->end()) {
+         result->Error("MISSING_ARGUMENT", "Missing displayUid argument");
+         return;
+     }
+     
+     int display_uid = std::get<int>(display_uid_it->second);
+     bool success = VirtualDisplayControl::SetPrimaryDisplayOnly(display_uid);
+     
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("restoreDisplayConfiguration") == 0) {
+     bool success = VirtualDisplayControl::RestoreDisplayConfiguration();
+     result->Success(flutter::EncodableValue(success));
+  } else if (method_call.method_name().compare("hasPendingConfiguration") == 0) {
+     bool has_pending = VirtualDisplayControl::HasPendingConfiguration();
+     result->Success(flutter::EncodableValue(has_pending));
   } else if (method_call.method_name().compare("putImmersiveModeEnabled") == 0) {
      auto enabled = (args->find(flutter::EncodableValue("enabled")))->second;
      bool immersive_enabled = static_cast<bool>(std::get<bool>((enabled)));

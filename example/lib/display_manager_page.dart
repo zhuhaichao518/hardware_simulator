@@ -74,6 +74,60 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
     }
   }
 
+  Future<void> _setPrimaryDisplayOnly(int displayUid) async {
+    try {
+      // Check if there's already a pending configuration
+      bool hasPending = await HardwareSimulator.hasPendingConfiguration();
+      if (hasPending) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已有待恢复的显示配置，请先恢复后再设置'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      bool success = await HardwareSimulator.setPrimaryDisplayOnly(displayUid);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功设置显示器 $displayUid 为主显示器并禁用其他显示器')),
+        );
+        // 重新加载显示器列表
+        await _loadDisplays();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('设置主显示器失败')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('设置主显示器失败: $e')),
+      );
+    }
+  }
+
+  Future<void> _restoreDisplayConfiguration() async {
+    try {
+      bool success = await HardwareSimulator.restoreDisplayConfiguration();
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功恢复显示配置')),
+        );
+        // 重新加载显示器列表
+        await _loadDisplays();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('恢复显示配置失败')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('恢复显示配置失败: $e')),
+      );
+    }
+  }
+
   Future<void> _setMultiDisplayMode(MultiDisplayMode mode) async {
     try {
       bool success = await HardwareSimulator.setMultiDisplayMode(mode);
@@ -511,6 +565,29 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                         ],
                       ),
                       SizedBox(height: 16),
+                      // 新增的显示器控制按钮
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: displays.isNotEmpty ? () => _setPrimaryDisplayOnly(displays[0].displayUid) : null,
+                            icon: Icon(Icons.looks_one),
+                            label: Text('仅显示第1个'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => _restoreDisplayConfiguration(),
+                            icon: Icon(Icons.restore),
+                            label: Text('恢复配置'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16),
                       Wrap(
                         spacing: 8.0,
                         runSpacing: 8.0,
@@ -707,6 +784,27 @@ class _DisplayManagerPageState extends State<DisplayManagerPage> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.settings, color: Colors.blue),
+                              tooltip: '显示器控制',
+                              onSelected: (action) {
+                                if (action == 'set_primary_only') {
+                                  _setPrimaryDisplayOnly(display.displayUid);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'set_primary_only',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.looks_one, color: Colors.orange),
+                                      SizedBox(width: 8),
+                                      Text('设为主显示器（禁用其他）'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                             PopupMenuButton<DisplayOrientation>(
                               icon: Icon(Icons.screen_rotation, color: Colors.orange),
                               tooltip: '旋转屏幕',

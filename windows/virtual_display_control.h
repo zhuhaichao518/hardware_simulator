@@ -45,6 +45,11 @@ public:
     static bool SetMultiDisplayMode(MultiDisplayMode mode, int primary_display_id = 0);
     static MultiDisplayMode GetCurrentMultiDisplayMode();
 
+    // Display control APIs for setting primary display and disabling others
+    static bool SetPrimaryDisplayOnly(int display_uid);
+    static bool RestoreDisplayConfiguration();
+    static bool HasPendingConfiguration();
+
     // Detailed display information structure
     // This structure mirrors the Dart DisplayData class for consistency
     struct DetailedDisplayInfo {
@@ -85,6 +90,14 @@ private:
     static bool initialized_;
     static HANDLE vdd_handle_;
     static std::vector<std::unique_ptr<VirtualDisplay>> displays_;
+    
+    // Display configuration backup for restore functionality
+    static std::vector<DISPLAYCONFIG_PATH_INFO> original_paths_;
+    static std::vector<DISPLAYCONFIG_MODE_INFO> original_modes_;
+    static bool has_backup_;
+    
+    // Helper method to save current display configuration
+    static bool SaveDisplayConfiguration();
 };
 
 #endif

@@ -13,6 +13,15 @@
 #include <devpkey.h>    // DEVPKEY_Device_*
 #include <winuser.h>    // DisplayConfig APIs
 
+// Define missing constants for older Windows SDK versions
+#ifndef DISPLAYCONFIG_PATH_PRIMARY_VIEW
+#define DISPLAYCONFIG_PATH_PRIMARY_VIEW 0x00000001
+#endif
+
+#ifndef DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE
+#define DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE 1
+#endif
+
 #include <string>
 #include <vector>
 #include <map>
@@ -24,6 +33,11 @@
 bool VirtualDisplayControl::initialized_ = false;
 HANDLE VirtualDisplayControl::vdd_handle_ = INVALID_HANDLE_VALUE;
 std::vector<std::unique_ptr<VirtualDisplay>> VirtualDisplayControl::displays_;
+
+// Display configuration backup for restore functionality
+std::vector<DISPLAYCONFIG_PATH_INFO> VirtualDisplayControl::original_paths_;
+std::vector<DISPLAYCONFIG_MODE_INFO> VirtualDisplayControl::original_modes_;
+bool VirtualDisplayControl::has_backup_ = false;
 
 namespace {
 
@@ -219,6 +233,21 @@ static std::string FileTimeToString(const FILETIME& ft) {
     
     return std::string(buffer);
 }
+
+// Helper function to get display target name
+static std::wstring GetDisplayTargetName(LUID adapterId, UINT32 targetId) {
+    DISPLAYCONFIG_TARGET_DEVICE_NAME targetName = {};
+    targetName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+    targetName.header.size = sizeof(targetName);
+    targetName.header.adapterId = adapterId;
+    targetName.header.id = targetId;
+
+    if (DisplayConfigGetDeviceInfo((DISPLAYCONFIG_DEVICE_INFO_HEADER*)&targetName) != ERROR_SUCCESS) {
+        return L"Unknown";
+    }
+    return std::wstring(targetName.monitorFriendlyDeviceName);
+}
+
 }
 
 bool VirtualDisplayControl::Initialize() {
@@ -873,4 +902,230 @@ VirtualDisplayControl::MultiDisplayMode VirtualDisplayControl::GetCurrentMultiDi
     return MultiDisplayMode::SecondaryOnly;
 }
 
+bool VirtualDisplayControl::SetPrimaryDisplayOnly(int display_uid) {
+    std::cout << "SetPrimaryDisplayOnly called with display_uid: " << display_uid << std::endl;
+    
+    // Check if there's already a pending configuration that hasn't been restored
+    if (has_backup_) {
+        std::cerr << "Error: A display configuration is already set and not restored. Please call RestoreDisplayConfiguration() first." << std::endl;
+        return false;
+    }
+    
+    // Save current configuration
+    if (!SaveDisplayConfiguration()) {
+        std::cerr << "Failed to save current display configuration" << std::endl;
+        return false;
+    }
+    
+    UINT32 numPathArrayElements = 0;
+    UINT32 numModeInfoArrayElements = 0;
+    LONG result = ERROR_SUCCESS;
+
+    // Get required buffer sizes
+    result = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &numPathArrayElements, &numModeInfoArrayElements);
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "GetDisplayConfigBufferSizes failed: " << result << std::endl;
+        return false;
+    }
+
+    // Allocate buffers
+    std::vector<DISPLAYCONFIG_PATH_INFO> pathArray(numPathArrayElements);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modeInfoArray(numModeInfoArrayElements);
+
+    // Query current display configuration
+    result = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, 
+                               &numPathArrayElements, pathArray.data(), 
+                               &numModeInfoArrayElements, modeInfoArray.data(), 
+                               nullptr);
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "QueryDisplayConfig failed: " << result << std::endl;
+        return false;
+    }
+
+    // Find the target display by matching with our display list
+    auto displayIt = std::find_if(displays_.begin(), displays_.end(),
+        [display_uid](const std::unique_ptr<VirtualDisplay>& display) {
+            return display && display->GetDisplayUid() == display_uid;
+        });
+
+    if (displayIt == displays_.end()) {
+        std::cerr << "Display with UID " << display_uid << " not found in managed displays" << std::endl;
+        return false;
+    }
+
+    // Get the device name of the target display
+    std::string targetDeviceName = (*displayIt)->GetDisplayInfo().device_name;
+    std::wstring wTargetDeviceName = StringToWideString(targetDeviceName);
+    
+    int targetPathIndex = -1;
+    
+    // Try to match by device name
+    for (UINT32 i = 0; i < numPathArrayElements; ++i) {
+        if (pathArray[i].flags & DISPLAYCONFIG_PATH_ACTIVE) {
+            // Get the device name for this path
+            DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
+            sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            sourceName.header.size = sizeof(sourceName);
+            sourceName.header.adapterId = pathArray[i].sourceInfo.adapterId;
+            sourceName.header.id = pathArray[i].sourceInfo.id;
+
+            if (DisplayConfigGetDeviceInfo((DISPLAYCONFIG_DEVICE_INFO_HEADER*)&sourceName) == ERROR_SUCCESS) {
+                std::wstring wSourceDeviceName(sourceName.viewGdiDeviceName);
+                std::string sourceDeviceName = WideStringToString(wSourceDeviceName);
+                
+                if (sourceDeviceName == targetDeviceName) {
+                    targetPathIndex = i;
+                    std::wcout << L"Found target display by device name: " << GetDisplayTargetName(pathArray[i].targetInfo.adapterId, pathArray[i].targetInfo.id) << std::endl;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // If not found by device name, try to match by display index
+    if (targetPathIndex == -1) {
+        int displayIndex = static_cast<int>(std::distance(displays_.begin(), displayIt));
+        int activePathCount = 0;
+        
+        for (UINT32 i = 0; i < numPathArrayElements; ++i) {
+            if (pathArray[i].flags & DISPLAYCONFIG_PATH_ACTIVE) {
+                if (activePathCount == displayIndex) {
+                    targetPathIndex = i;
+                    std::wcout << L"Found target display by index: " << GetDisplayTargetName(pathArray[i].targetInfo.adapterId, pathArray[i].targetInfo.id) << std::endl;
+                    break;
+                }
+                activePathCount++;
+            }
+        }
+    }
+
+    if (targetPathIndex == -1) {
+        std::cerr << "No active display found to set as primary" << std::endl;
+        return false;
+    }
+
+    // Create new configuration with only the target display active
+    for (UINT32 i = 0; i < numPathArrayElements; ++i) {
+        if (i == static_cast<UINT32>(targetPathIndex)) {
+            // Set this display as primary and active
+            pathArray[i].flags = DISPLAYCONFIG_PATH_ACTIVE | DISPLAYCONFIG_PATH_PRIMARY_VIEW;
+            // Use the existing mode info index for this path
+            // pathArray[i].sourceInfo.modeInfoIdx remains unchanged
+            // pathArray[i].targetInfo.modeInfoIdx remains unchanged
+        } else {
+            // Disable all other displays
+            pathArray[i].flags = 0;
+        }
+    }
+    
+    // Set the primary display position in mode info
+    for (UINT32 i = 0; i < numModeInfoArrayElements; ++i) {
+        if (modeInfoArray[i].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE) {
+            // Find the mode info that corresponds to our target display
+            bool isTargetMode = false;
+            for (UINT32 j = 0; j < numPathArrayElements; ++j) {
+                if (j == static_cast<UINT32>(targetPathIndex) && 
+                    pathArray[j].sourceInfo.modeInfoIdx == i) {
+                    isTargetMode = true;
+                    break;
+                }
+            }
+            
+            if (isTargetMode) {
+                // Set primary display position to (0,0)
+                modeInfoArray[i].sourceMode.position.x = 0;
+                modeInfoArray[i].sourceMode.position.y = 0;
+            }
+        }
+    }
+
+    // Apply the new configuration
+    result = SetDisplayConfig(
+        numPathArrayElements,
+        pathArray.data(),
+        numModeInfoArrayElements,
+        modeInfoArray.data(),
+        SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES
+    );
+
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "SetDisplayConfig failed: " << result << std::endl;
+        return false;
+    }
+
+    std::cout << "Successfully set display " << display_uid << " as primary and disabled other displays" << std::endl;
+    return true;
+}
+
+bool VirtualDisplayControl::RestoreDisplayConfiguration() {
+    std::cout << "RestoreDisplayConfiguration called" << std::endl;
+    
+    if (!has_backup_) {
+        std::cerr << "No display configuration backup available to restore" << std::endl;
+        return false;
+    }
+
+    if (original_paths_.empty()) {
+        std::cerr << "Original display configuration is empty" << std::endl;
+        return false;
+    }
+
+    // Apply the original configuration
+    LONG result = SetDisplayConfig(
+        static_cast<UINT32>(original_paths_.size()),
+        original_paths_.data(),
+        static_cast<UINT32>(original_modes_.size()),
+        original_modes_.data(),
+        SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES
+    );
+
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "SetDisplayConfig failed to restore original configuration: " << result << std::endl;
+        return false;
+    }
+
+    std::cout << "Successfully restored original display configuration" << std::endl;
+    
+    // Clear the backup to prevent accidental double-restore
+    has_backup_ = false;
+    original_paths_.clear();
+    original_modes_.clear();
+    
+    return true;
+}
+
+bool VirtualDisplayControl::HasPendingConfiguration() {
+    return has_backup_;
+}
+
+bool VirtualDisplayControl::SaveDisplayConfiguration() {
+    UINT32 numPathArrayElements = 0;
+    UINT32 numModeInfoArrayElements = 0;
+    LONG result = ERROR_SUCCESS;
+
+    // Get required buffer sizes
+    result = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &numPathArrayElements, &numModeInfoArrayElements);
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "GetDisplayConfigBufferSizes failed: " << result << std::endl;
+        return false;
+    }
+
+    // Allocate buffers
+    original_paths_.resize(numPathArrayElements);
+    original_modes_.resize(numModeInfoArrayElements);
+
+    // Query current display configuration
+    result = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, 
+                               &numPathArrayElements, original_paths_.data(), 
+                               &numModeInfoArrayElements, original_modes_.data(), 
+                               nullptr);
+    if (result != ERROR_SUCCESS) {
+        std::cerr << "QueryDisplayConfig failed: " << result << std::endl;
+        return false;
+    }
+
+    has_backup_ = true;
+    std::cout << "Display configuration saved successfully. Found " << numPathArrayElements << " active displays." << std::endl;
+    return true;
+}
 

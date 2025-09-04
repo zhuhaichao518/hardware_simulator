@@ -268,6 +268,19 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('getCurrentMultiDisplayMode() has not been implemented.');
   }
 
+  // Display control APIs for setting primary display and disabling others
+  Future<bool> setPrimaryDisplayOnly(int displayUid) {
+    throw UnimplementedError('setPrimaryDisplayOnly() has not been implemented.');
+  }
+
+  Future<bool> restoreDisplayConfiguration() {
+    throw UnimplementedError('restoreDisplayConfiguration() has not been implemented.');
+  }
+
+  Future<bool> hasPendingConfiguration() {
+    throw UnimplementedError('hasPendingConfiguration() has not been implemented.');
+  }
+
   Future<void> setDragWindowContents(bool enabled) async {
     throw UnimplementedError(
         'setDragWindowContents() has not been implemented.');
