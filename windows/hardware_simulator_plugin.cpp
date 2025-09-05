@@ -211,10 +211,8 @@ void HardwareSimulatorPlugin::UpdateStaticMonitors() {
     
     // Check if display count changed and notify callbacks
     int current_display_count = static_cast<int>(static_monitors_.size());
-    if (current_display_count != previous_display_count_) {
-        previous_display_count_ = current_display_count;
-        notifyDisplayCountChanged(current_display_count);
-    }
+    // We report even the count is not changed, because it maybe a screen switch.
+    notifyDisplayCountChanged(current_display_count);
 }
 
 const std::vector<MonitorInfo>& HardwareSimulatorPlugin::GetStaticMonitors() {
