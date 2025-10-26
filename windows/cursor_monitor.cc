@@ -384,10 +384,14 @@ std::vector<uint8_t> ConvertUint32ToUint8(const uint32_t* inputArray,
     return outputArray;
 }
 
+static HANDLE lastCursorHandle = nullptr;
+
 void SyncCursorImage() {
     CURSORINFO ci = { sizeof(ci) };
     GetCursorInfo(&ci);
     HANDLE h = GetCursorHandle(ci.hCursor);
+    if (h == lastCursorHandle) return;
+    lastCursorHandle = h;
     if (h != NULL) {
         for (auto callback : callbacks) {
             if (!hookAllCursorImage[callback.first]) {
@@ -588,6 +592,28 @@ void CursorChangedEventProc(HWINEVENTHOOK hook,
             SyncCursorImage();
             break;
         }
+        case EVENT_OBJECT_LOCATIONCHANGE:
+        {
+            if (positionCallbacks.size() > 0) {
+                POINT currentPos;
+                GetCursorPos(&currentPos);
+                
+                // Check if position has changed
+                if (currentPos.x != lastCursorPos.x || currentPos.y != lastCursorPos.y) {
+                    lastCursorPos = currentPos;
+                    
+                    // Get mouse position and screen info
+                    MousePosition mousePos = GetMousePositionAndScreenId();
+                    
+                    // Notify all position callbacks with direct double values
+                    for (auto& callback : positionCallbacks) {
+                        callback.second(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+                    }
+                }
+            }
+            SyncCursorImage();
+            break;
+        }
         default:
             break;
         }
@@ -605,12 +631,6 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
     hookAllCursorImage[callback_id] = hookAll;
     cachedcursors[callback_id] = {};
 
-    if (!IsCursorVisible()) {
-        MousePosition mousePos = GetMousePositionAndScreenId();
-        std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
-        callback(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
-    }
-
     // If hookAll is true, trigger an immediate callback
     if (hookAll) {
         CURSORINFO ci = { sizeof(ci) };
@@ -626,6 +646,12 @@ void CursorMonitor::startHook(CursorChangedCallback callback, long long callback
         cachedcursors[callback_id].insert(hash);
         callback(CPP_CURSOR_UPDATED_IMAGE, hash, datawith8bitbytes);
     }
+
+    if (!IsCursorVisible()) {
+        MousePosition mousePos = GetMousePositionAndScreenId();
+        std::vector<uint8_t> positionBytes = FloatToBytes(mousePos.xPercent, mousePos.yPercent);
+        callback(CPP_CURSOR_INVISIBLE, mousePos.screenId, positionBytes);
+    }
 }
 
 void CursorMonitor::endHook(long long callback_id) {
@@ -640,6 +666,7 @@ void CursorMonitor::endHook(long long callback_id) {
 void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long callback_id) {
     positionCallbacks[callback_id] = callback;
     
+    /* old implementation of system wide cursor hook.
     // Start hook thread if this is the first position callback
     // We have to do this: https://www.soinside.com/question/hP9qqHrPWatdNm68nNtFfd
     if (positionCallbacks.size() == 1) {
@@ -650,15 +677,16 @@ void CursorMonitor::startPositionHook(CursorPositionCallback callback, long long
     // Send initial position
     MousePosition mousePos = GetMousePositionAndScreenId();
     callback(CPP_CURSOR_POSITION_CHANGED, mousePos.screenId, mousePos.xPercent, mousePos.yPercent);
+    */
 }
 
 void CursorMonitor::endPositionHook(long long callback_id) {
     positionCallbacks.erase(positionCallbacks.find(callback_id));
     
     // Stop hook thread if no more position callbacks
-    if (positionCallbacks.empty()) {
+    /*if (positionCallbacks.empty()) {
         stopHookThread();
-    }
+    }*/
 }
 
 // Static member definitions for thread management
