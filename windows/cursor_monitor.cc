@@ -384,14 +384,14 @@ std::vector<uint8_t> ConvertUint32ToUint8(const uint32_t* inputArray,
     return outputArray;
 }
 
-static HANDLE lastCursorHandle = nullptr;
+static HCURSOR lastHCursor = nullptr;
 
 void SyncCursorImage() {
     CURSORINFO ci = { sizeof(ci) };
     GetCursorInfo(&ci);
+    if (ci.hCursor == lastHCursor) return;
+    lastHCursor = ci.hCursor;
     HANDLE h = GetCursorHandle(ci.hCursor);
-    if (h == lastCursorHandle) return;
-    lastCursorHandle = h;
     if (h != NULL) {
         for (auto callback : callbacks) {
             if (!hookAllCursorImage[callback.first]) {
