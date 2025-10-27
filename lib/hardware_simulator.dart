@@ -301,6 +301,10 @@ class HardwareSimulator {
   static Future<void> setDragWindowContents(bool enabled) {
     return HardwareSimulatorPlatform.instance.setDragWindowContents(enabled);
   }
+
+  static Future<void> updateStaticMonitors() {
+    return HardwareSimulatorPlatform.instance.updateStaticMonitors();
+  }
 }
 
 // Enums for display management

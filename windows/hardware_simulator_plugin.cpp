@@ -171,7 +171,7 @@ std::optional<int> HardwareSimulatorPlugin::dpi_monitor_proc_id_ = NULL;
 std::vector<MonitorInfo> HardwareSimulatorPlugin::static_monitors_;
 std::map<int, std::function<void(int)>> HardwareSimulatorPlugin::display_count_callbacks_;
 std::mutex HardwareSimulatorPlugin::display_count_callbacks_mutex_;
-int HardwareSimulatorPlugin::previous_display_count_ = 0;
+int HardwareSimulatorPlugin::previous_display_count_ = -1;
 
 void HardwareSimulatorPlugin::UpdateStaticMonitors() {
     static_monitors_.clear();
@@ -211,8 +211,10 @@ void HardwareSimulatorPlugin::UpdateStaticMonitors() {
     
     // Check if display count changed and notify callbacks
     int current_display_count = static_cast<int>(static_monitors_.size());
-    // We report even the count is not changed, because it maybe a screen switch.
+    // We report even the count is not changed, because it maybe a screen switch
+    //if (current_display_count != previous_display_count_) {
     notifyDisplayCountChanged(current_display_count);
+    //}
 }
 
 const std::vector<MonitorInfo>& HardwareSimulatorPlugin::GetStaticMonitors() {
@@ -1365,6 +1367,9 @@ void HardwareSimulatorPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("unlockCursor") == 0) {
         UnlockCursor();
         result->Success(flutter::EncodableValue(true));
+  } else if (method_call.method_name().compare("updateStaticMonitors") == 0) {
+        UpdateStaticMonitors();
+        result->Success();
   } else {
     result->NotImplemented();
   }

@@ -293,4 +293,8 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
   Future<bool> setPrimaryDisplay(int displayIndex) async {
     throw UnimplementedError('setPrimaryDisplay() has not been implemented.');
   }
+
+  Future<void> updateStaticMonitors() async {
+    throw UnimplementedError('updateStaticMonitors() has not been implemented.');
+  }
 }

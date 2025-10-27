@@ -554,4 +554,12 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
       'displayIndex': displayIndex,
     });
   }
+
+  @override
+  Future<void> updateStaticMonitors() async {
+    if (!Platform.isWindows) {
+      return;
+    }
+    await methodChannel.invokeMethod('updateStaticMonitors');
+  }
 }
