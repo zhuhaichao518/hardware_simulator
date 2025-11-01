@@ -1062,12 +1062,13 @@ bool VirtualDisplayControl::RestoreDisplayConfiguration() {
     
     if (!has_backup_) {
         std::cerr << "No display configuration backup available to restore" << std::endl;
-        return false;
+        return true;
     }
 
     if (original_paths_.empty()) {
-        std::cerr << "Original display configuration is empty" << std::endl;
-        return false;
+        std::cerr << "Original display configuration is empty. No need to restore configuration." << std::endl;
+        has_backup_ = false;
+        return true;
     }
 
     // Apply the original configuration
