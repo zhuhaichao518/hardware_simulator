@@ -200,6 +200,17 @@ abstract class HardwareSimulatorPlatform extends PlatformInterface {
     throw UnimplementedError('performTouchMove() has not been implemented.');
   }
 
+  // Pen event simulation
+  Future<void> performPenEvent(
+      double x, double y, bool isDown, bool hasButton, double pressure, double rotation, double tilt, int screenId) async {
+    throw UnimplementedError('performPenEvent() has not been implemented.');
+  }
+
+  Future<void> performPenMove(
+      double x, double y, bool hasButton, double pressure, double rotation, double tilt, int screenId) async {
+    throw UnimplementedError('performPenMove() has not been implemented.');
+  }
+
   Future<int> createGameController() async {
     throw UnimplementedError(
         'createGameController() has not been implemented.');

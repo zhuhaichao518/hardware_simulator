@@ -45,6 +45,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   final TextEditingController touchXController = TextEditingController();
   final TextEditingController touchYController = TextEditingController();
   final TextEditingController touchIdController = TextEditingController();
+  
+  final TextEditingController penXController = TextEditingController();
+  final TextEditingController penYController = TextEditingController();
+  final TextEditingController penPressureController = TextEditingController(text: '0.5');
+  final TextEditingController penRotationController = TextEditingController(text: '0');
+  final TextEditingController penTiltController = TextEditingController(text: '0');
 
   final HardwareSimulator hardwareSimulator = HardwareSimulator();
 
@@ -287,6 +293,33 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     HardwareSimulator.performTouchEvent(x, y, touchId, false, 0);
   }
 
+  void _penDown() {
+    double x = double.tryParse(penXController.text) ?? 0;
+    double y = double.tryParse(penYController.text) ?? 0;
+    double pressure = double.tryParse(penPressureController.text) ?? 0.5;
+    double rotation = double.tryParse(penRotationController.text) ?? 0;
+    double tilt = double.tryParse(penTiltController.text) ?? 0;
+    HardwareSimulator.performPenEvent(x, y, true, false, pressure, rotation, tilt, 0);
+  }
+
+  void _penMove() {
+    double x = double.tryParse(penXController.text) ?? 0;
+    double y = double.tryParse(penYController.text) ?? 0;
+    double pressure = double.tryParse(penPressureController.text) ?? 0.5;
+    double rotation = double.tryParse(penRotationController.text) ?? 0;
+    double tilt = double.tryParse(penTiltController.text) ?? 0;
+    HardwareSimulator.performPenMove(x, y, false, pressure, rotation, tilt, 0);
+  }
+
+  void _penUp() {
+    double x = double.tryParse(penXController.text) ?? 0;
+    double y = double.tryParse(penYController.text) ?? 0;
+    double pressure = double.tryParse(penPressureController.text) ?? 0.5;
+    double rotation = double.tryParse(penRotationController.text) ?? 0;
+    double tilt = double.tryParse(penTiltController.text) ?? 0;
+    HardwareSimulator.performPenEvent(x, y, false, false, pressure, rotation, tilt, 0);
+  }
+
   void _setDragWindowContents(bool enabled) {
     HardwareSimulator.setDragWindowContents(enabled);
   }
@@ -520,6 +553,79 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 _setDragWindowContents(false);
               },
               child: Text('setDragWindowContents false'),
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        // Pen input section
+        Text(
+          'Pen Input Test',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: penXController,
+                decoration: InputDecoration(labelText: 'Pen X (0-1)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: penYController,
+                decoration: InputDecoration(labelText: 'Pen Y (0-1)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: penPressureController,
+                decoration: InputDecoration(labelText: 'Pressure (0-1)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: penRotationController,
+                decoration: InputDecoration(labelText: 'Rotation (0-360)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: penTiltController,
+                decoration: InputDecoration(labelText: 'Tilt (0-90)'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _penDown,
+              child: Text('Pen Down'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _penMove,
+              child: Text('Pen Move'),
+            ),
+            SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _penUp,
+              child: Text('Pen Up'),
             ),
           ],
         ),

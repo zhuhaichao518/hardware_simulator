@@ -388,6 +388,35 @@ class MethodChannelHardwareSimulator extends HardwareSimulatorPlatform {
   }
 
   @override
+  Future<void> performPenEvent(
+      double x, double y, bool isDown, bool hasButton, double pressure, double rotation, double tilt, int screenId) async {
+    await methodChannel.invokeMethod('penEvent', {
+      'x': x,
+      'y': y,
+      'isDown': isDown,
+      'hasButton': hasButton,
+      'pressure': pressure,
+      'rotation': rotation,
+      'tilt': tilt,
+      'screenId': screenId,
+    });
+  }
+
+  @override
+  Future<void> performPenMove(
+      double x, double y, bool hasButton, double pressure, double rotation, double tilt, int screenId) async {
+    await methodChannel.invokeMethod('penMove', {
+      'x': x,
+      'y': y,
+      'hasButton': hasButton,
+      'pressure': pressure,
+      'rotation': rotation,
+      'tilt': tilt,
+      'screenId': screenId,
+    });
+  }
+
+  @override
   Future<int> createGameController() async {
     if (!Platform.isWindows) return -1;
     final gamepadId =

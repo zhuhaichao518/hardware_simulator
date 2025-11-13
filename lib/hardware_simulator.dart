@@ -214,6 +214,18 @@ class HardwareSimulator {
         .performTouchMove(x, y, touchId, screenId);
   }
 
+  static void performPenEvent(
+      double x, double y, bool isDown, bool hasButton, double pressure, double rotation, double tilt, int screenId) {
+    HardwareSimulatorPlatform.instance
+        .performPenEvent(x, y, isDown, hasButton, pressure, rotation, tilt, screenId);
+  }
+
+  static void performPenMove(
+      double x, double y, bool hasButton, double pressure, double rotation, double tilt, int screenId) {
+    HardwareSimulatorPlatform.instance
+        .performPenMove(x, y, hasButton, pressure, rotation, tilt, screenId);
+  }
+
   static Future<GameController?> createGameController() {
     return GameController.createGameController();
   }

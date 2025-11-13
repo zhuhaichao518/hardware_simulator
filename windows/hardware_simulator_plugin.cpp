@@ -20,6 +20,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <algorithm>
+#include <cmath>
 #include <future>
 #include <memory>
 #include <sstream>
@@ -41,6 +42,8 @@ namespace hardware_simulator {
 // Function declarations
 void performKeyEvent(uint16_t modcode, bool isDown, bool isRepeat);
 void performTouchEvent(int screenId, double x, double y, uint32_t touchId, bool isDown, bool isRepeat);
+void performPenEvent(int screenId, double x, double y, bool isDown, bool hasButton, double pressure, double rotation, double tilt);
+void performPenMove(int screenId, double x, double y, bool hasButton, double pressure, double rotation, double tilt);
 void clearAllPressedEvents();
 bool setPrimaryDisplay(int displayIndex);
 
@@ -52,6 +55,9 @@ PFN_DestroySyntheticPointerDevice fnDestroySyntheticPointerDevice = nullptr;
 HSYNTHETICPOINTERDEVICE g_touchDevice = nullptr;
 POINTER_TYPE_INFO g_touchInfo[10] = {};
 UINT32 g_activeTouchSlots = 0;
+
+HSYNTHETICPOINTERDEVICE g_penDevice = nullptr;
+POINTER_TYPE_INFO g_penInfo = {};
 
 // auto repeat feature
 struct KeyState {
@@ -304,6 +310,25 @@ void destroyTouchDevice() {
     }
 }
 
+bool createPenDevice() {
+    if (!fnCreateSyntheticPointerDevice) {
+        initTouchAPI();
+        if (!fnCreateSyntheticPointerDevice) {
+            return false;
+        }
+    }
+
+    g_penDevice = fnCreateSyntheticPointerDevice(PT_PEN, 1, POINTER_FEEDBACK_DEFAULT);
+    return g_penDevice != nullptr;
+}
+
+void destroyPenDevice() {
+    if (g_penDevice && fnDestroySyntheticPointerDevice) {
+        fnDestroySyntheticPointerDevice(g_penDevice);
+        g_penDevice = nullptr;
+    }
+}
+
 bool sendTouchInput() {
     if (!g_touchDevice || !fnInjectSyntheticPointerInput) {
         return false;
@@ -338,6 +363,44 @@ void send_touch_input() {
     if (send != true) {
         // put resend into new thread.
         std::future<void> retry_future = std::async(std::launch::async, async_send_touch_input_retry);
+        retry_future.wait();
+    }
+}
+
+bool sendPenInput() {
+    if (!g_penDevice || !fnInjectSyntheticPointerInput) {
+        return false;
+    }
+
+    if (fnInjectSyntheticPointerInput(g_penDevice, &g_penInfo, 1)) {
+        return true;
+    }
+
+    return false;
+}
+
+void async_send_pen_input_retry() {
+    while (true) {
+        auto send = sendPenInput();
+        if (send == 1) {
+            break;
+        }
+
+        auto hDesk = syncThreadDesktop();
+        if (_lastKnownInputDesktop != hDesk) {
+            _lastKnownInputDesktop = hDesk;
+        }
+        else {
+            break;
+        }
+    }
+}
+
+void send_pen_input() {
+    auto send = sendPenInput();
+    if (send != true) {
+        // put resend into new thread.
+        std::future<void> retry_future = std::async(std::launch::async, async_send_pen_input_retry);
         retry_future.wait();
     }
 }
@@ -449,6 +512,146 @@ void performTouchMove(int screenId, double x, double y, uint32_t touchId) {
     }
 
     send_touch_input();
+}
+
+void performPenEvent(int screenId, double x, double y, bool isDown, bool hasButton, double pressure, double rotation, double tilt) {
+    if (!g_penDevice) {
+        if (!createPenDevice()) {
+            return;
+        }
+    }
+
+    g_penInfo.type = PT_PEN;
+    auto& penInfo = g_penInfo.penInfo;
+    penInfo.pointerInfo.pointerType = PT_PEN;
+    penInfo.pointerInfo.pointerId = 0;
+
+    LONG out_x, out_y;
+    if (!adjust_touch_to_screen(screenId, x, y, out_x, out_y)) return;
+    penInfo.pointerInfo.ptPixelLocation.x = out_x;
+    penInfo.pointerInfo.ptPixelLocation.y = out_y;
+
+    if (isDown) {
+        penInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
+    } else {
+        // Clear contact and range flags first, then set UP flag
+        penInfo.pointerInfo.pointerFlags &= ~(POINTER_FLAG_INCONTACT | POINTER_FLAG_INRANGE);
+        penInfo.pointerInfo.pointerFlags |= POINTER_FLAG_UP;
+    }
+
+    // Windows only supports a single pen button, so send all buttons as the barrel button
+    if (hasButton) {
+        penInfo.penFlags |= PEN_FLAG_BARREL;
+    } else {
+        penInfo.penFlags &= ~PEN_FLAG_BARREL;
+    }
+
+    // Default to pen tool type (not eraser)
+    penInfo.penFlags &= ~PEN_FLAG_ERASER;
+
+    penInfo.penMask = PEN_MASK_NONE;
+
+    // Windows doesn't support hover distance, so only pass pressure when the pointer is in contact
+    if ((penInfo.pointerInfo.pointerFlags & POINTER_FLAG_INCONTACT) && pressure > 0.0) {
+        penInfo.penMask |= PEN_MASK_PRESSURE;
+        // Convert the 0.0..1.0 double to the 0..1024 range that Windows uses
+        penInfo.pressure = static_cast<UINT32>(pressure * 1024.0);
+    } else {
+        penInfo.pressure = 0;
+    }
+
+    if (rotation >= 0.0 && rotation <= 360.0) {
+        penInfo.penMask |= PEN_MASK_ROTATION;
+        penInfo.rotation = static_cast<INT32>(rotation);
+    } else {
+        penInfo.rotation = 0;
+    }
+
+    // We require rotation and tilt to perform the conversion to X and Y tilt angles
+    if (tilt >= 0.0 && rotation >= 0.0 && rotation <= 360.0) {
+        const double M_PI = 3.14159265358979323846;
+        auto rotationRads = rotation * (M_PI / 180.0);
+        auto tiltRads = tilt * (M_PI / 180.0);
+        auto r = std::sin(tiltRads);
+        auto z = std::cos(tiltRads);
+
+        // Convert polar coordinates into X and Y tilt angles
+        penInfo.penMask |= PEN_MASK_TILT_X | PEN_MASK_TILT_Y;
+        penInfo.tiltX = static_cast<INT32>(std::atan2(std::sin(-rotationRads) * r, z) * 180.0 / M_PI);
+        penInfo.tiltY = static_cast<INT32>(std::atan2(std::cos(-rotationRads) * r, z) * 180.0 / M_PI);
+    } else {
+        penInfo.tiltX = 0;
+        penInfo.tiltY = 0;
+    }
+
+    send_pen_input();
+
+    // Clear edge-triggered flags after sending
+    constexpr auto EDGE_TRIGGERED_POINTER_FLAGS = POINTER_FLAG_DOWN | POINTER_FLAG_UP | POINTER_FLAG_CANCELED | POINTER_FLAG_UPDATE;
+    penInfo.pointerInfo.pointerFlags &= ~EDGE_TRIGGERED_POINTER_FLAGS;
+}
+
+void performPenMove(int screenId, double x, double y, bool hasButton, double pressure, double rotation, double tilt) {
+    if (!g_penDevice) {
+        return;
+    }
+
+    auto& penInfo = g_penInfo.penInfo;
+
+    LONG out_x, out_y;
+    if (!adjust_touch_to_screen(screenId, x, y, out_x, out_y)) return;
+    penInfo.pointerInfo.ptPixelLocation.x = out_x;
+    penInfo.pointerInfo.ptPixelLocation.y = out_y;
+
+    penInfo.pointerInfo.pointerFlags = POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE;
+
+    // Windows only supports a single pen button, so send all buttons as the barrel button
+    if (hasButton) {
+        penInfo.penFlags |= PEN_FLAG_BARREL;
+    } else {
+        penInfo.penFlags &= ~PEN_FLAG_BARREL;
+    }
+
+    penInfo.penMask = PEN_MASK_NONE;
+
+    // Windows doesn't support hover distance, so only pass pressure when the pointer is in contact
+    if (pressure > 0.0) {
+        penInfo.penMask |= PEN_MASK_PRESSURE;
+        // Convert the 0.0..1.0 double to the 0..1024 range that Windows uses
+        penInfo.pressure = static_cast<UINT32>(pressure * 1024.0);
+    } else {
+        penInfo.pressure = 0;
+    }
+
+    if (rotation >= 0.0 && rotation <= 360.0) {
+        penInfo.penMask |= PEN_MASK_ROTATION;
+        penInfo.rotation = static_cast<INT32>(rotation);
+    } else {
+        penInfo.rotation = 0;
+    }
+
+    // We require rotation and tilt to perform the conversion to X and Y tilt angles
+    if (tilt >= 0.0 && rotation >= 0.0 && rotation <= 360.0) {
+        const double M_PI = 3.14159265358979323846;
+        auto rotationRads = rotation * (M_PI / 180.0);
+        auto tiltRads = tilt * (M_PI / 180.0);
+        auto r = std::sin(tiltRads);
+        auto z = std::cos(tiltRads);
+
+        // Convert polar coordinates into X and Y tilt angles
+        penInfo.penMask |= PEN_MASK_TILT_X | PEN_MASK_TILT_Y;
+        penInfo.tiltX = static_cast<INT32>(std::atan2(std::sin(-rotationRads) * r, z) * 180.0 / M_PI);
+        penInfo.tiltY = static_cast<INT32>(std::atan2(std::cos(-rotationRads) * r, z) * 180.0 / M_PI);
+    } else {
+        penInfo.tiltX = 0;
+        penInfo.tiltY = 0;
+    }
+
+    send_pen_input();
+
+    // Clear edge-triggered flags after sending
+    constexpr auto EDGE_TRIGGERED_POINTER_FLAGS = POINTER_FLAG_DOWN | POINTER_FLAG_UP | POINTER_FLAG_CANCELED | POINTER_FLAG_UPDATE;
+    penInfo.pointerInfo.pointerFlags &= ~EDGE_TRIGGERED_POINTER_FLAGS;
 }
 
 BOOL IsRunningAsSystem() {
@@ -619,6 +822,7 @@ HardwareSimulatorPlugin::HardwareSimulatorPlugin() {
 HardwareSimulatorPlugin::~HardwareSimulatorPlugin() {
     StopMonitorThread();
     destroyTouchDevice();
+    destroyPenDevice();
     CleanupCursorLock();
     if (dpi_monitor_proc_id_.has_value()) {
         registrar_->UnregisterTopLevelWindowProcDelegate(dpi_monitor_proc_id_.value());
@@ -768,6 +972,17 @@ void clearAllPressedEvents() {
         }
     }
     g_touch_states.clear();
+    
+    // Clear pen device if it exists and is in contact
+    if (g_penDevice && (g_penInfo.penInfo.pointerInfo.pointerFlags & POINTER_FLAG_INCONTACT)) {
+        // Send pen up event to clear the state
+        g_penInfo.penInfo.pointerInfo.pointerFlags &= ~(POINTER_FLAG_INCONTACT | POINTER_FLAG_INRANGE);
+        g_penInfo.penInfo.pointerInfo.pointerFlags |= POINTER_FLAG_UP;
+        send_pen_input();
+        // Clear edge-triggered flags
+        constexpr auto EDGE_TRIGGERED_POINTER_FLAGS = POINTER_FLAG_DOWN | POINTER_FLAG_UP | POINTER_FLAG_CANCELED | POINTER_FLAG_UPDATE;
+        g_penInfo.penInfo.pointerInfo.pointerFlags &= ~EDGE_TRIGGERED_POINTER_FLAGS;
+    }
     
     // Clear mouse buttons (left and right)
     // Check if mouse buttons are currently pressed using GetAsyncKeyState
@@ -1103,6 +1318,44 @@ void HardwareSimulatorPlugin::HandleMethodCall(
             static_cast<double>(std::get<double>((x))),
             static_cast<double>(std::get<double>((y))),
             static_cast<uint32_t>(std::get<int>((touchId)))
+        );
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("penEvent") == 0) {
+        auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
+        auto x = (args->find(flutter::EncodableValue("x")))->second;
+        auto y = (args->find(flutter::EncodableValue("y")))->second;
+        auto isDown = (args->find(flutter::EncodableValue("isDown")))->second;
+        auto hasButton = (args->find(flutter::EncodableValue("hasButton")))->second;
+        auto pressure = (args->find(flutter::EncodableValue("pressure")))->second;
+        auto rotation = (args->find(flutter::EncodableValue("rotation")))->second;
+        auto tilt = (args->find(flutter::EncodableValue("tilt")))->second;
+        performPenEvent(
+            static_cast<int>(std::get<int>((screenId))),
+            static_cast<double>(std::get<double>((x))),
+            static_cast<double>(std::get<double>((y))),
+            static_cast<bool>(std::get<bool>((isDown))),
+            static_cast<bool>(std::get<bool>((hasButton))),
+            static_cast<double>(std::get<double>((pressure))),
+            static_cast<double>(std::get<double>((rotation))),
+            static_cast<double>(std::get<double>((tilt)))
+        );
+        result->Success(nullptr);
+  } else if (method_call.method_name().compare("penMove") == 0) {
+        auto screenId = (args->find(flutter::EncodableValue("screenId")))->second;
+        auto x = (args->find(flutter::EncodableValue("x")))->second;
+        auto y = (args->find(flutter::EncodableValue("y")))->second;
+        auto hasButton = (args->find(flutter::EncodableValue("hasButton")))->second;
+        auto pressure = (args->find(flutter::EncodableValue("pressure")))->second;
+        auto rotation = (args->find(flutter::EncodableValue("rotation")))->second;
+        auto tilt = (args->find(flutter::EncodableValue("tilt")))->second;
+        performPenMove(
+            static_cast<int>(std::get<int>((screenId))),
+            static_cast<double>(std::get<double>((x))),
+            static_cast<double>(std::get<double>((y))),
+            static_cast<bool>(std::get<bool>((hasButton))),
+            static_cast<double>(std::get<double>((pressure))),
+            static_cast<double>(std::get<double>((rotation))),
+            static_cast<double>(std::get<double>((tilt)))
         );
         result->Success(nullptr);
   } else if (method_call.method_name().compare("clearAllPressedEvents") == 0) {
